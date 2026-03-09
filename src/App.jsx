@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 import { Card } from "./Card";
 import { AddHabitModal } from "./AddHabitModal";
+import Login from "./Login";
 
-function App() {
+function Dashboard() {
   const [cards, setCards] = useState([
     { id: 1, emoji: "🚶", label: "Walk", goal: 10000, unit: "steps" },
     { id: 2, emoji: "💧", label: "Water", goal: 8, unit: "glasses" },
@@ -12,7 +14,7 @@ function App() {
   const [openAddModal, setOpenAddModal] = useState(false);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black gap-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-white gap-4">
       {cards.map((card) => (
         <Card
           key={card.id}
@@ -38,6 +40,18 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
