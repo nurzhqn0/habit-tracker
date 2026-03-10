@@ -1,0 +1,162 @@
+.page {
+  background:
+    radial-gradient(1200px 500px at 10% 5%, rgb(56 189 248 / 0.2), transparent 55%),
+    radial-gradient(900px 420px at 90% 90%, rgb(249 115 22 / 0.16), transparent 60%),
+    linear-gradient(180deg, #f8fbff 0%, #f7fafc 100%);
+}
+
+.bgGlowTop,
+.bgGlowBottom {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(44px);
+  pointer-events: none;
+}
+
+.bgGlowTop {
+  width: 340px;
+  height: 340px;
+  top: -120px;
+  right: -70px;
+  background: rgb(34 211 238 / 0.26);
+  animation: floatSlow 11s ease-in-out infinite;
+}
+
+.bgGlowBottom {
+  width: 300px;
+  height: 300px;
+  left: -90px;
+  bottom: 80px;
+  background: rgb(251 146 60 / 0.24);
+  animation: floatSlow 12s ease-in-out infinite reverse;
+}
+
+.panelWrap {
+  position: relative;
+}
+
+.panel {
+  border-radius: 24px;
+  border: 1px solid rgb(148 163 184 / 0.24);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.9) 0%, rgb(255 255 255 / 0.8) 100%);
+  backdrop-filter: blur(10px);
+  padding: 1.25rem;
+  box-shadow:
+    0 20px 70px -40px rgb(2 6 23 / 0.4),
+    inset 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+.metricCard {
+  border-radius: 14px;
+  border: 1px solid rgb(148 163 184 / 0.3);
+  background: rgb(255 255 255 / 0.75);
+  padding: 0.8rem;
+  box-shadow: 0 12px 34px -30px rgb(15 23 42 / 0.6);
+}
+
+.habitRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgb(148 163 184 / 0.2);
+  background: rgb(248 250 252 / 0.9);
+  padding: 0.75rem 0.8rem;
+  color: #334155;
+  font-size: 0.93rem;
+}
+
+.habitRow strong {
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.liveDot {
+  border-radius: 999px;
+  background: rgb(220 252 231);
+  color: rgb(21 128 61);
+  border: 1px solid rgb(134 239 172);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.22rem 0.62rem;
+}
+
+.fadeIn {
+  animation: fadeIn 0.55s ease-out both;
+}
+
+.fadeInUp {
+  animation: fadeUp 0.7s ease-out both;
+}
+
+.fadeInUpDelayed {
+  animation: fadeUp 0.8s ease-out 0.15s both;
+}
+
+.staggerOne {
+  animation: fadeUp 0.6s ease-out 0.2s both;
+}
+
+.staggerTwo {
+  animation: fadeUp 0.6s ease-out 0.28s both;
+}
+
+.staggerThree {
+  animation: fadeUp 0.6s ease-out 0.36s both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatSlow {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(0, -14px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .bgGlowBottom {
+    bottom: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 1rem;
+  }
+
+  .bgGlowTop {
+    width: 220px;
+    height: 220px;
+    right: -90px;
+  }
+
+  .bgGlowBottom {
+    width: 200px;
+    height: 200px;
+    left: -90px;
+  }
+}

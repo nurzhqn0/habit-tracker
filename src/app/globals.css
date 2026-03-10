@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@radix-ui/themes/styles.css";
+
+:root {
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
