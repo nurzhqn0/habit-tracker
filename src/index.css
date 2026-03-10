@@ -24,7 +24,7 @@ a:hover {
 }
 
 body {
-  @apply bg-black;
+  @apply bg-white;
   margin: 0;
   display: flex;
   place-items: center;
