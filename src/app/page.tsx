@@ -3,12 +3,12 @@
 import { Button } from "@radix-ui/themes";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import AuthModal from "../components/auth/AuthModal";
 import { useAuth } from "../hooks/useAuth";
 import styles from "./page.module.css";
 
-export default function HomePage() {
+function HomePageContent() {
   const { isReady, isLoggedIn } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -179,5 +179,13 @@ export default function HomePage() {
 
       <AuthModal open={modalOpen} onOpenChange={onModalOpenChange} />
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <HomePageContent />
+    </Suspense>
   );
 }
