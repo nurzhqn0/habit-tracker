@@ -1,14 +1,241 @@
 <script setup lang="ts">
-// Placeholder — replaced by the checkmark grid main screen in Phase 3.
-const auth = useAuthStore();
+import draggable from "vuedraggable";
+import type { DropdownMenuItem } from "@nuxt/ui";
+import type { Habit, HabitOverviewItem } from "~~/shared/types/habits";
+import { apiFetch } from "~/services/api/client";
+import type { Preferences } from "~~/shared/types/api";
+import { lastNDateKeys, todayKey, weekdayShort, dayOfMonth } from "~/composables/useDates";
+import { paletteColor } from "~/composables/usePalette";
+
+definePageMeta({ layout: "dashboard" });
+
+const store = useHabitsStore();
+const toast = useToast();
+
+const prefs = ref<Preferences | null>(null);
+const dayCount = ref(7);
+const days = computed(() => lastNDateKeys(dayCount.value)); // newest first
+const today = todayKey();
+
+const formOpen = ref(false);
+const editing = ref<Habit | undefined>();
+
+async function load() {
+  const range = days.value;
+  await store.loadOverview(range[range.length - 1]!, range[0]!);
+}
+
+onMounted(async () => {
+  prefs.value = await apiFetch<Preferences>("/me/preferences").catch(() => null);
+  await load().catch(() => toast.add({ title: "Could not load habits", color: "error" }));
+});
+
+const sortItems = computed<DropdownMenuItem[]>(() =>
+  (
+    [
+      ["manual", "Manual order", "i-lucide-grip-vertical"],
+      ["name", "By name", "i-lucide-arrow-down-a-z"],
+      ["color", "By color", "i-lucide-palette"],
+      ["score", "By strength", "i-lucide-trending-up"],
+      ["status", "By today's status", "i-lucide-circle-check"],
+    ] as const
+  ).map(([value, label, icon]) => ({
+    label,
+    icon,
+    type: "checkbox" as const,
+    checked: store.sort === value,
+    onSelect: async () => {
+      store.sort = value;
+      await load();
+    },
+  })),
+);
+
+async function onToggle(item: HabitOverviewItem, date: string) {
+  if (item.habit.archived) return;
+  try {
+    await store.toggle(item.habit.id, date);
+  } catch {
+    toast.add({ title: "Could not save entry", color: "error" });
+  }
+}
+
+async function onSetValue(item: HabitOverviewItem, date: string, value: number) {
+  try {
+    await store.setValue(item.habit.id, date, value);
+  } catch {
+    toast.add({ title: "Could not save entry", color: "error" });
+  }
+}
+
+function openCreate() {
+  editing.value = undefined;
+  formOpen.value = true;
+}
+
+function openEdit(habit: Habit) {
+  editing.value = habit;
+  formOpen.value = true;
+}
+
+function rowMenu(item: HabitOverviewItem): DropdownMenuItem[][] {
+  const habit = item.habit;
+  return [
+    [
+      { label: "Details", icon: "i-lucide-chart-line", to: `/app/habits/${habit.id}` },
+      { label: "Edit", icon: "i-lucide-pencil", onSelect: () => openEdit(habit) },
+      {
+        label: habit.archived ? "Unarchive" : "Archive",
+        icon: habit.archived ? "i-lucide-archive-restore" : "i-lucide-archive",
+        onSelect: () => store.setArchived(habit.id, !habit.archived),
+      },
+    ],
+    [
+      {
+        label: "Delete",
+        icon: "i-lucide-trash-2",
+        color: "error",
+        onSelect: async () => {
+          await store.deleteHabit(habit.id);
+          toast.add({ title: `Deleted "${habit.name}"`, color: "neutral" });
+        },
+      },
+    ],
+  ];
+}
+
+const dragEnabled = computed(() => store.sort === "manual");
+
+async function onDragEnd() {
+  await store.reorder(store.items.map((i) => i.habit.id)).catch(() => {
+    toast.add({ title: "Could not reorder", color: "error" });
+    load();
+  });
+}
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl p-8">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-highlighted">Welcome, {{ auth.user?.first_name }}</h1>
-      <UButton color="neutral" variant="ghost" icon="i-lucide-log-out" label="Logout" @click="auth.logout()" />
-    </div>
-    <p class="mt-2 text-muted">Habit grid coming in Phase 3.</p>
-  </div>
+  <UDashboardPanel id="habits">
+    <template #header>
+      <UDashboardNavbar title="Habits">
+        <template #leading>
+          <UDashboardSidebarCollapse />
+        </template>
+        <template #right>
+          <USwitch v-model="store.showArchived" label="Archived" size="sm" @change="load" />
+          <UDropdownMenu :items="sortItems">
+            <UButton icon="i-lucide-arrow-up-down" color="neutral" variant="ghost" aria-label="Sort" />
+          </UDropdownMenu>
+          <UButton icon="i-lucide-plus" label="New habit" @click="openCreate" />
+        </template>
+      </UDashboardNavbar>
+    </template>
+
+    <template #body>
+      <div v-if="store.loading" class="flex justify-center py-16">
+        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+      </div>
+
+      <div
+        v-else-if="store.items.length === 0"
+        class="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center"
+      >
+        <UIcon name="i-lucide-sprout" class="size-10 text-muted" />
+        <p class="text-lg font-semibold text-highlighted">No habits yet</p>
+        <p class="text-sm text-muted">Create your first habit and start building streaks.</p>
+        <UButton icon="i-lucide-plus" label="Create habit" @click="openCreate" />
+      </div>
+
+      <div v-else class="overflow-x-auto">
+        <div class="min-w-fit">
+          <div class="flex items-center gap-2 border-b border-default pb-2">
+            <div class="w-6 shrink-0" />
+            <div class="min-w-40 flex-1" />
+            <div
+              v-for="date in days"
+              :key="date"
+              class="w-9 text-center text-[10px] uppercase leading-tight text-muted"
+            >
+              <div>{{ weekdayShort(date) }}</div>
+              <div class="font-semibold" :class="date === today ? 'text-primary' : ''">
+                {{ dayOfMonth(date) }}
+              </div>
+            </div>
+            <div class="w-8 shrink-0" />
+          </div>
+
+          <draggable
+            v-model="store.items"
+            item-key="habit.id"
+            handle=".drag-handle"
+            :disabled="!dragEnabled"
+            @end="onDragEnd"
+          >
+            <template #item="{ element: item }">
+              <div
+                class="flex items-center gap-2 border-b border-default py-1"
+                :class="item.habit.archived ? 'opacity-50' : ''"
+              >
+                <UIcon
+                  name="i-lucide-grip-vertical"
+                  class="drag-handle w-6 shrink-0 text-dimmed"
+                  :class="dragEnabled ? 'cursor-grab' : 'opacity-20'"
+                />
+
+                <NuxtLink
+                  :to="`/app/habits/${item.habit.id}`"
+                  class="flex min-w-40 flex-1 items-center gap-3"
+                >
+                  <HabitScoreRing :score="item.score" :color="paletteColor(item.habit.color)" />
+                  <div class="min-w-0">
+                    <p
+                      class="truncate text-sm font-medium"
+                      :style="{ color: paletteColor(item.habit.color) }"
+                    >
+                      {{ item.habit.name }}
+                    </p>
+                    <p v-if="item.streak > 1" class="flex items-center gap-1 text-xs text-muted">
+                      <UIcon name="i-lucide-flame" class="size-3" />{{ item.streak }} days
+                    </p>
+                  </div>
+                </NuxtLink>
+
+                <template v-for="date in days" :key="date">
+                  <HabitNumberCell
+                    v-if="item.habit.type === 1"
+                    :value="item.entries[date]"
+                    :target-value="item.habit.target_value"
+                    :target-type="item.habit.target_type"
+                    :color="paletteColor(item.habit.color)"
+                    :unit="item.habit.unit"
+                    @save="(value) => onSetValue(item, date, value)"
+                  />
+                  <HabitCheckmarkCell
+                    v-else
+                    :value="item.entries[date]"
+                    :color="paletteColor(item.habit.color)"
+                    :show-question-marks="prefs?.show_question_marks ?? false"
+                    @toggle="onToggle(item, date)"
+                  />
+                </template>
+
+                <UDropdownMenu :items="rowMenu(item)">
+                  <UButton
+                    icon="i-lucide-ellipsis-vertical"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    class="w-8 shrink-0"
+                    aria-label="Habit menu"
+                  />
+                </UDropdownMenu>
+              </div>
+            </template>
+          </draggable>
+        </div>
+      </div>
+
+      <HabitFormModal v-model:open="formOpen" :habit="editing" />
+    </template>
+  </UDashboardPanel>
 </template>
