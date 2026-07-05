@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
-from app.api.routers import auth, habits, me, stats
+from app.api.routers import auth, export, habits, me, stats
 from app.config import get_settings
 from app.infrastructure.db.base import create_engine, create_session_factory
 
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(me.router, prefix="/api/v1")
     app.include_router(habits.router, prefix="/api/v1")
     app.include_router(stats.router, prefix="/api/v1")
+    app.include_router(export.router, prefix="/api/v1")
 
     return app
 
