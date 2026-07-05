@@ -173,6 +173,7 @@ async function onDragEnd() {
           >
             <template #item="{ element: item }">
               <div
+                data-testid="habit-row"
                 class="flex items-center gap-2 border-b border-default py-1"
                 :class="item.habit.archived ? 'opacity-50' : ''"
               >

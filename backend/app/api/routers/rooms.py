@@ -103,9 +103,10 @@ async def room_habits(
         RoomHabitWithLinkOut(
             habit=RoomHabitOut.model_validate(h),
             linked_habit_id=next(
-                (l.habit_id for l in links if l.room_habit_id == h.id and l.user_id == user.id), None
+                (link.habit_id for link in links if link.room_habit_id == h.id and link.user_id == user.id),
+                None,
             ),
-            members_linked=sum(1 for l in links if l.room_habit_id == h.id),
+            members_linked=sum(1 for link in links if link.room_habit_id == h.id),
         )
         for h in habits
     ]

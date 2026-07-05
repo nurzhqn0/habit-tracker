@@ -31,6 +31,7 @@ const display = computed(() => {
 <template>
   <button
     type="button"
+    data-testid="check-cell"
     class="flex size-9 items-center justify-center rounded-md transition hover:bg-elevated active:scale-90"
     @click="emit('toggle')"
   >
