@@ -43,6 +43,9 @@ def telegram_payload(telegram_id: int = 1000, **overrides) -> dict:
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
+    from app.api.routers.auth import limiter
+
+    limiter.enabled = False  # all test requests share one client IP
     get_settings.cache_clear()
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: TEST_SETTINGS

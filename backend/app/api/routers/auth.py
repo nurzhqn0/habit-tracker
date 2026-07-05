@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.api.deps import SessionDep, SettingsDep
 from app.api.schemas.auth import RefreshRequest, TelegramAuthPayload, TokenResponse
@@ -7,10 +9,13 @@ from app.infrastructure.repositories.user_repo import UserRepo
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+limiter = Limiter(key_func=get_remote_address)
+
 
 @router.post("/telegram", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def telegram_login(
-    payload: TelegramAuthPayload, session: SessionDep, settings: SettingsDep
+    request: Request, payload: TelegramAuthPayload, session: SessionDep, settings: SettingsDep
 ) -> TokenResponse:
     result = await auth_uc.telegram_login(session, payload.model_dump(exclude_none=True), settings)
     return TokenResponse(
@@ -19,7 +24,10 @@ async def telegram_login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(body: RefreshRequest, session: SessionDep, settings: SettingsDep) -> TokenResponse:
+@limiter.limit("30/minute")
+async def refresh(
+    request: Request, body: RefreshRequest, session: SessionDep, settings: SettingsDep
+) -> TokenResponse:
     result = await auth_uc.refresh_session(session, body.refresh_token, settings)
     return TokenResponse(
         access_token=result.access_token, refresh_token=result.refresh_token, user=result.user
