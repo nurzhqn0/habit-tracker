@@ -1,0 +1,35 @@
+[project]
+name = "habitflow-backend"
+version = "0.1.0"
+description = "HabitFlow API — uHabits web rebuild (FastAPI, clean architecture)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "alembic>=1.14",
+    "aiogram>=3.15",
+    "apscheduler>=3.10,<4",
+    "pyjwt>=2.10",
+    "pydantic-settings>=2.7",
+    "openpyxl>=3.1",
+    "slowapi>=0.1.9",
+    "python-multipart>=0.0.20",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "httpx>=0.28",
+    "ruff>=0.9",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["app/tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
