@@ -1,0 +1,52 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////srv/app/data/habitflow.db
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      BOT_USERNAME: ${BOT_USERNAME:-}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
+    volumes:
+      - sqlite-data:/srv/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  bot:
+    build: ./backend
+    command: python -m app.workers.bot.main
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////srv/app/data/habitflow.db
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in .env}
+      BOT_USERNAME: ${BOT_USERNAME:-}
+    volumes:
+      - sqlite-data:/srv/app/data
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      NUXT_PUBLIC_API_BASE: /api/v1
+      NUXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-}
+
+volumes:
+  sqlite-data:
