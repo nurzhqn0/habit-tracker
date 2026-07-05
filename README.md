@@ -62,9 +62,24 @@ cd frontend && npx playwright test   # e2e smoke: login → habit → toggles �
 ## Production
 
 ```bash
-cp .env.example .env            # set JWT_SECRET (required), BOT_TOKEN, BOT_USERNAME
-make up                         # docker compose: nginx on :80
+cp .env.example .env            # set JWT_SECRET (openssl rand -hex 32), BOT_TOKEN, BOT_USERNAME,
+                                # FRONTEND_ORIGIN=https://your-domain
+make up                         # docker compose: nginx on :80 (and :443 once TLS is configured)
 ```
+
+Production guards (enforced at startup when `ENVIRONMENT=production`, the compose default):
+JWT_SECRET must be ≥32 chars and not the dev default; `TEST_MODE` must be off; API docs
+(`/docs`, `/openapi.json`) are disabled. Uvicorn trusts `X-Forwarded-For` from nginx so
+rate limiting sees real client IPs.
+
+**TLS**: drop `fullchain.pem` + `privkey.pem` into `nginx/certs/`, then
+`cp nginx/nginx-tls.conf.example nginx/nginx.conf`, set your domain in it, and
+`docker compose restart nginx`. HSTS is enabled in the TLS config.
+
+**Backups**: `make backup` — consistent SQLite snapshot (WAL-safe) into `backups/`.
+
+**CI**: GitHub Actions runs backend lint+tests+pip-audit, frontend build+npm audit,
+and the Playwright e2e smoke on every push/PR.
 
 The Telegram Login Widget requires your domain to be linked to the bot via
 [@BotFather](https://t.me/BotFather) → `/setdomain`.

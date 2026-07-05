@@ -3,17 +3,21 @@ services:
     image: nginx:1.27-alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       api:
         condition: service_healthy
       frontend:
         condition: service_started
+    restart: unless-stopped
 
   api:
     build: ./backend
     environment:
+      ENVIRONMENT: production
       DATABASE_URL: sqlite+aiosqlite:////srv/app/data/habitflow.db
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       BOT_TOKEN: ${BOT_TOKEN:-}
@@ -26,11 +30,13 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
 
   bot:
     build: ./backend
     command: python -m app.workers.bot.main
     environment:
+      ENVIRONMENT: production
       DATABASE_URL: sqlite+aiosqlite:////srv/app/data/habitflow.db
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in .env}
@@ -47,6 +53,7 @@ services:
     environment:
       NUXT_PUBLIC_API_BASE: /api/v1
       NUXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-}
+    restart: unless-stopped
 
 volumes:
   sqlite-data:

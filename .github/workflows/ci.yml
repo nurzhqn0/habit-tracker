@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync
+      - run: uv run ruff check app scripts
+      - run: uv run pytest -q
+      - name: pip-audit
+        run: |
+          uv export --no-dev --no-hashes --no-annotate --no-header --format requirements-txt | grep -v "^\." > /tmp/reqs.txt
+          uvx pip-audit -r /tmp/reqs.txt --disable-pip --no-deps
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # npm install (not ci): macOS-generated lockfile lacks linux optional dep chains.
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: npm audit (production deps)
+        run: npm audit --omit=dev --audit-level=high
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: cd backend && uv sync
+      - run: cd frontend && npm install --no-audit --no-fund
+      - run: cd frontend && npx playwright install --with-deps chromium
+      - run: cd frontend && npm run build
+      - name: Playwright smoke
+        run: cd frontend && CI=1 npx playwright test

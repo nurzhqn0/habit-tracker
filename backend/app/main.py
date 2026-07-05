@@ -18,9 +18,30 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+_DEV_JWT_SECRET = "dev-secret-change-me-in-production-0000"
+
+
+def _enforce_production_settings(settings) -> None:
+    if settings.environment != "production":
+        return
+    if settings.jwt_secret == _DEV_JWT_SECRET or len(settings.jwt_secret) < 32:
+        raise RuntimeError("Production requires a JWT_SECRET of at least 32 characters")
+    if settings.test_mode:
+        raise RuntimeError("TEST_MODE must be disabled in production")
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="HabitFlow API", version="0.1.0", lifespan=lifespan)
+    _enforce_production_settings(settings)
+    is_production = settings.environment == "production"
+    app = FastAPI(
+        title="HabitFlow API",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=None if is_production else "/docs",
+        redoc_url=None if is_production else "/redoc",
+        openapi_url=None if is_production else "/openapi.json",
+    )
 
     from slowapi.errors import RateLimitExceeded
     from slowapi import _rate_limit_exceeded_handler

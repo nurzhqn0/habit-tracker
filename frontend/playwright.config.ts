@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+// On macOS, node may run under Rosetta (x64 nvm build) while the uv venv is arm64.
+const archPrefix = process.platform === "darwin" ? "arch -arm64 " : "";
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
@@ -9,9 +12,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      // arch -arm64: node may run under Rosetta (x64 nvm build) while the uv venv is arm64.
-      command:
-        "cd ../backend && DATABASE_URL=sqlite+aiosqlite:///./data/e2e.db TEST_MODE=1 FRONTEND_ORIGIN=http://localhost:3210 arch -arm64 uv run sh -c 'alembic upgrade head && uvicorn app.main:app --port 8210'",
+      command: `cd ../backend && ENVIRONMENT=development DATABASE_URL=sqlite+aiosqlite:///./data/e2e.db TEST_MODE=1 FRONTEND_ORIGIN=http://localhost:3210 ${archPrefix}uv run sh -c 'alembic upgrade head && uvicorn app.main:app --port 8210'`,
       url: "http://localhost:8210/health",
       reuseExistingServer: false,
       timeout: 60_000,

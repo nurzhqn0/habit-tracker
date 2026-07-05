@@ -22,4 +22,5 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 EXPOSE 8000
 # API by default; the bot service overrides the command.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# --proxy-headers: trust X-Forwarded-For from nginx so rate limiting sees real client IPs.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]

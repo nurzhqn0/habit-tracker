@@ -1,13 +1,16 @@
-.PHONY: dev api web bot migrate test lint up down
+.PHONY: dev api web bot migrate test lint up down backup
+
+backup:
+	sh scripts/backup.sh
 
 api:
-	cd backend && uv run uvicorn app.main:app --reload --port 8000
+	cd backend && ENVIRONMENT=development uv run uvicorn app.main:app --reload --port 8000
 
 web:
 	cd frontend && npm run dev
 
 bot:
-	cd backend && uv run python -m app.workers.bot.main
+	cd backend && ENVIRONMENT=development uv run python -m app.workers.bot.main
 
 migrate:
 	cd backend && uv run alembic upgrade head

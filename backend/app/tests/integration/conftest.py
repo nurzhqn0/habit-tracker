@@ -14,6 +14,7 @@ from app.main import create_app
 TEST_BOT_TOKEN = "12345:test-bot-token"
 
 TEST_SETTINGS = Settings(
+    environment="development",
     database_url="sqlite+aiosqlite://",
     jwt_secret="test-secret-for-integration-tests-only",
     bot_token=TEST_BOT_TOKEN,
