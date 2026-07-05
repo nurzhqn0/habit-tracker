@@ -13,6 +13,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import get_settings
 from app.infrastructure.db.base import create_engine, create_session_factory
 from app.workers.bot import handlers
+from app.workers.bot.notifications import notification_tick
 from app.workers.bot.scheduler import reminder_tick
 
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,7 @@ async def run() -> None:
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(reminder_tick, "cron", second=0, args=[bot, session_factory])
+    scheduler.add_job(notification_tick, "interval", seconds=5, args=[bot, session_factory])
     scheduler.start()
 
     log.info("Bot worker started (@%s)", settings.bot_username or "unknown")
