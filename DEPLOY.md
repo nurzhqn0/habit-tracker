@@ -29,6 +29,18 @@ Do **not** run `/setdomain` yet — the domain must be serving HTTPS first (step
 
 ## 2. Prepare the server
 
+**Sizing**: 2 GB RAM minimum to build the images on the server itself (the Nuxt build
+peaks well above 1 GB). On a 1–2 GB VPS, add swap first — the frontend build will
+otherwise die with `JavaScript heap out of memory` (exit code 134):
+
+```bash
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab   # persist across reboots
+```
+
 SSH in as root (or a sudo user):
 
 ```bash
@@ -216,6 +228,7 @@ docker system prune -f               # reclaim old image layers after updates
 
 | Symptom | Check |
 |---|---|
+| Frontend build dies with exit 134 / "heap out of memory" | Not enough RAM — add swap (step 2) and rerun `docker compose up -d --build` |
 | api container restarts forever | `docker compose logs api` — usually the JWT_SECRET/TEST_MODE production guard or a bad `DATABASE_URL` |
 | Telegram button missing, "Dev login" shown instead | `BOT_USERNAME` empty in `.env` → rebuild frontend: `docker compose up -d --build frontend` |
 | Telegram login returns "Login failed" | Domain not set via `/setdomain`, or `BOT_TOKEN` mismatch between the bot that signed the widget payload and the API verifying it |

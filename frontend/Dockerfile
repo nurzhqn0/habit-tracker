@@ -7,6 +7,8 @@ COPY package.json package-lock.json ./
 RUN npm install --no-audit --no-fund
 
 COPY . .
+# Nitro build needs >1GB heap; small VPSes hit node's default limit (OOM, exit 134).
+ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN npm run build
 
 FROM node:24-slim
