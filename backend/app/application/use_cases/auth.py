@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from app.infrastructure.security.jwt import (
     generate_refresh_token,
     hash_refresh_token,
 )
-from app.infrastructure.telegram.login_verifier import verify_telegram_auth
+from app.infrastructure.telegram.oidc_verifier import verify_id_token
 
 
 @dataclass
@@ -29,18 +30,18 @@ async def _issue_tokens(session: AsyncSession, user: UserRow, settings: Settings
     return AuthResult(user=user, access_token=access, refresh_token=refresh)
 
 
-async def telegram_login(
-    session: AsyncSession, payload: dict[str, str | int], settings: Settings
-) -> AuthResult:
-    if not verify_telegram_auth(payload, settings.bot_token):
+async def telegram_login(session: AsyncSession, id_token: str, settings: Settings) -> AuthResult:
+    # JWKS fetch inside is blocking urllib (cached after first call) — keep it off the loop.
+    claims = await asyncio.to_thread(verify_id_token, id_token, settings.tg_client_id)
+    if claims is None or not claims.get("id"):
         raise ForbiddenError("Invalid Telegram authentication data")
 
     users = UserRepo(session)
     user = await users.upsert_from_telegram(
-        telegram_id=int(payload["id"]),
-        first_name=str(payload.get("first_name", "")),
-        username=str(payload["username"]) if payload.get("username") else None,
-        photo_url=str(payload["photo_url"]) if payload.get("photo_url") else None,
+        telegram_id=int(claims["id"]),
+        first_name=str(claims.get("given_name") or claims.get("name") or ""),
+        username=str(claims["preferred_username"]) if claims.get("preferred_username") else None,
+        photo_url=str(claims["picture"]) if claims.get("picture") else None,
     )
     await users.get_or_create_preferences(user.id)
     result = await _issue_tokens(session, user, settings)

@@ -22,6 +22,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       BOT_TOKEN: ${BOT_TOKEN:-}
       BOT_USERNAME: ${BOT_USERNAME:-}
+      TG_CLIENT_ID: ${TG_CLIENT_ID:-}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
     volumes:
       - sqlite-data:/srv/app/data
@@ -53,6 +54,7 @@ services:
     environment:
       NUXT_PUBLIC_API_BASE: /api/v1
       NUXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-}
+      NUXT_PUBLIC_TG_CLIENT_ID: ${TG_CLIENT_ID:-}
     restart: unless-stopped
 
 volumes:

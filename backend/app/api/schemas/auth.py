@@ -1,16 +1,8 @@
 from pydantic import BaseModel, ConfigDict
 
 
-class TelegramAuthPayload(BaseModel):
-    model_config = ConfigDict(extra="allow")  # widget may add fields; all participate in HMAC
-
-    id: int
-    first_name: str = ""
-    last_name: str | None = None
-    username: str | None = None
-    photo_url: str | None = None
-    auth_date: int
-    hash: str
+class TelegramLoginRequest(BaseModel):
+    id_token: str
 
 
 class RefreshRequest(BaseModel):

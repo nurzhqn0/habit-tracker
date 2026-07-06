@@ -3,7 +3,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.api.deps import SessionDep, SettingsDep
-from app.api.schemas.auth import RefreshRequest, TelegramAuthPayload, TokenResponse
+from app.api.schemas.auth import RefreshRequest, TelegramLoginRequest, TokenResponse
 from app.application.use_cases import auth as auth_uc
 from app.infrastructure.repositories.user_repo import UserRepo
 
@@ -15,9 +15,9 @@ limiter = Limiter(key_func=get_remote_address)
 @router.post("/telegram", response_model=TokenResponse)
 @limiter.limit("10/minute")
 async def telegram_login(
-    request: Request, payload: TelegramAuthPayload, session: SessionDep, settings: SettingsDep
+    request: Request, payload: TelegramLoginRequest, session: SessionDep, settings: SettingsDep
 ) -> TokenResponse:
-    result = await auth_uc.telegram_login(session, payload.model_dump(exclude_none=True), settings)
+    result = await auth_uc.telegram_login(session, payload.id_token, settings)
     return TokenResponse(
         access_token=result.access_token, refresh_token=result.refresh_token, user=result.user
     )

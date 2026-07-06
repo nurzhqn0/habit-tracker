@@ -24,8 +24,9 @@ https://habitflow.example.com
 2. Pick a display name and a username (must end in `bot`, e.g. `habitflow_prod_bot`).
 3. Save the **bot token** (`123456789:AA...`) — this is `BOT_TOKEN`.
 4. The username **without `@`** is `BOT_USERNAME`.
-
-Do **not** run `/setdomain` yet — the domain must be serving HTTPS first (step 7).
+5. In the BotFather mini app: **Bot Settings → Web Login** — note the **Client ID**
+   (this is `TG_CLIENT_ID`). You'll register your site URL there in step 7, once
+   HTTPS is live.
 
 ## 2. Prepare the server
 
@@ -162,17 +163,26 @@ EOF
 sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/habitflow.sh
 ```
 
-## 7. Link the domain to the bot
+## 7. Register the site with the bot
 
-In [@BotFather](https://t.me/BotFather):
+In the [@BotFather](https://t.me/BotFather) mini app: **Bot Settings → Web Login →
+Allowed URLs** — add your site origin:
 
 ```
-/setdomain → select your bot → habitflow.example.com
+https://habitflow.example.com
 ```
 
-Now the **Log in with Telegram** button works on the landing page. After logging in,
-open **Settings → Connect bot** and press **Start** in the chat — reminders and room
-notifications are delivered from then on.
+Make sure `.env` has the matching `TG_CLIENT_ID` (shown on the same Web Login page),
+then recreate the affected services if you just added it:
+
+```bash
+docker compose up -d --force-recreate api frontend
+```
+
+Now the **Sign in with Telegram** button works on the landing page (popup-based
+OIDC flow; the backend verifies the returned id_token against Telegram's JWKS).
+After logging in, open **Settings → Connect bot** and press **Start** in the chat —
+reminders and room notifications are delivered from then on.
 
 ## 8. Backups
 

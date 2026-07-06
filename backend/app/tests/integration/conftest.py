@@ -1,52 +1,64 @@
-import hashlib
-import hmac
 import time
 from collections.abc import AsyncIterator
 
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings, get_settings
 from app.infrastructure.db.base import create_engine, create_session_factory
 from app.infrastructure.db.tables import Base
+from app.infrastructure.telegram import oidc_verifier
 from app.main import create_app
 
-TEST_BOT_TOKEN = "12345:test-bot-token"
+TEST_CLIENT_ID = "123456789"
 
 TEST_SETTINGS = Settings(
     environment="development",
     database_url="sqlite+aiosqlite://",
     jwt_secret="test-secret-for-integration-tests-only",
-    bot_token=TEST_BOT_TOKEN,
+    bot_token="12345:test-bot-token",
+    tg_client_id=TEST_CLIENT_ID,
     test_mode=False,
 )
 
+# One RSA keypair for the whole test session; the verifier is patched to use it.
+_PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+_PUBLIC_KEY = _PRIVATE_KEY.public_key()
 
-def sign_telegram_payload(payload: dict, bot_token: str = TEST_BOT_TOKEN) -> dict:
-    """Signs a widget payload exactly like Telegram does."""
-    fields = {k: v for k, v in payload.items() if k != "hash" and v is not None}
-    data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
-    secret_key = hashlib.sha256(bot_token.encode()).digest()
-    payload["hash"] = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    return payload
+# Rogue key for forgery tests.
+_ROGUE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
-def telegram_payload(telegram_id: int = 1000, **overrides) -> dict:
-    payload = {
+def make_id_token(telegram_id: int = 1000, *, key=None, **overrides) -> str:
+    """Signs a Telegram-style OIDC id_token with the test key (or a rogue one)."""
+    now = int(time.time())
+    claims = {
+        "iss": oidc_verifier.ISSUER,
+        "aud": TEST_CLIENT_ID,
+        "sub": str(telegram_id),
+        "iat": now,
+        "exp": now + 3600,
         "id": telegram_id,
-        "first_name": "Alice",
-        "username": f"alice{telegram_id}",
-        "auth_date": int(time.time()),
+        "name": "Alice Test",
+        "given_name": "Alice",
+        "preferred_username": f"alice{telegram_id}",
+        "picture": None,
         **overrides,
     }
-    return sign_telegram_payload(payload)
+    return jwt.encode(
+        {k: v for k, v in claims.items() if v is not None}, key or _PRIVATE_KEY, algorithm="RS256"
+    )
 
 
 @pytest.fixture
-async def client() -> AsyncIterator[AsyncClient]:
+async def client(monkeypatch) -> AsyncIterator[AsyncClient]:
     from app.api.routers.auth import limiter
 
     limiter.enabled = False  # all test requests share one client IP
+    monkeypatch.setattr(oidc_verifier, "_signing_key_from_token", lambda token: _PUBLIC_KEY)
+
     get_settings.cache_clear()
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: TEST_SETTINGS
@@ -66,7 +78,7 @@ async def client() -> AsyncIterator[AsyncClient]:
 
 async def login(client: AsyncClient, telegram_id: int = 1000) -> dict:
     """Logs a user in; returns the token response payload."""
-    response = await client.post("/auth/telegram", json=telegram_payload(telegram_id))
+    response = await client.post("/auth/telegram", json={"id_token": make_id_token(telegram_id)})
     assert response.status_code == 200, response.text
     return response.json()
 

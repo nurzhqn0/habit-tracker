@@ -7,6 +7,7 @@ export default defineNuxtConfig({
     public: {
       apiBase: "http://localhost:8000/api/v1",
       botUsername: "",
+      tgClientId: "", // BotFather -> Web Login -> Client ID
     },
   },
 });

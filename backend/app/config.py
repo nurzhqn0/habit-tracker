@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     bot_token: str = ""
     bot_username: str = ""
+    tg_client_id: str = ""  # BotFather -> Bot Settings -> Web Login -> Client ID
 
     frontend_origin: str = "http://localhost:3000"
     test_mode: bool = False

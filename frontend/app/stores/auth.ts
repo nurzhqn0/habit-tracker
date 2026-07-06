@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import type { TelegramAuthPayload, TokenResponse, User } from "~~/shared/types/api";
+import type { TokenResponse, User } from "~~/shared/types/api";
 import { apiFetch, useAuthTokens } from "~/services/api/client";
 
 export const useAuthStore = defineStore("auth", {
@@ -18,10 +18,10 @@ export const useAuthStore = defineStore("auth", {
       this.user = response.user;
     },
 
-    async loginWithTelegram(payload: TelegramAuthPayload) {
+    async loginWithTelegram(idToken: string) {
       const response = await apiFetch<TokenResponse>("/auth/telegram", {
         method: "POST",
-        body: payload,
+        body: { id_token: idToken },
       });
       this._applyTokens(response);
     },
