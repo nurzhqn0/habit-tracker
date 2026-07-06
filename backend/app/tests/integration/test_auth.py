@@ -59,9 +59,11 @@ async def test_refresh_rotation(client):
     assert refreshed.status_code == 200
     assert refreshed.json()["refresh_token"] != old_refresh
 
-    # Old refresh token is single-use.
+    # Rotation has a short grace window: a concurrent refresh from another
+    # tab (or the SSR/client race) with the old token still succeeds.
     reused = await client.post("/auth/refresh", json={"refresh_token": old_refresh})
-    assert reused.status_code == 403
+    assert reused.status_code == 200
+    assert reused.json()["refresh_token"] != old_refresh
 
 
 async def test_logout_revokes_refresh(client):

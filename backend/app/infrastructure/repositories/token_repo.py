@@ -33,3 +33,11 @@ class TokenRepo:
     async def revoke(self, row: RefreshTokenRow) -> None:
         row.revoked = True
         await self.session.flush()
+
+    async def retire(self, row: RefreshTokenRow, grace_seconds: int = 60) -> None:
+        """Rotation: keep the old token briefly valid so concurrent refreshes
+        (second tab, SSR + client race) don't kill the whole session."""
+        deadline = datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=grace_seconds)
+        if row.expires_at > deadline:
+            row.expires_at = deadline
+        await self.session.flush()

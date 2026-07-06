@@ -59,7 +59,9 @@ async def refresh_session(session: AsyncSession, refresh_token: str, settings: S
     if user is None:
         raise ForbiddenError("Invalid refresh token")
 
-    await tokens.revoke(row)  # rotation: old refresh token is single-use
+    # Rotation with a short grace window instead of instant revocation, so a
+    # concurrent refresh from another tab (or the SSR/client race) still works.
+    await tokens.retire(row)
     result = await _issue_tokens(session, user, settings)
     await session.commit()
     return result

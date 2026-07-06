@@ -21,7 +21,16 @@ async function onAuth(data: { id_token?: string; error?: string }) {
 }
 
 function openLogin() {
-  (window as any).Telegram?.Login?.open();
+  const login = (window as any).Telegram?.Login;
+  if (!login) {
+    toast.add({
+      title: "Telegram login is not available",
+      description: "The Telegram widget could not load. Check your connection or ad blocker.",
+      color: "error",
+    });
+    return;
+  }
+  login.open();
 }
 
 async function devLogin() {
@@ -33,32 +42,67 @@ async function devLogin() {
   }
 }
 
-onMounted(() => {
-  if (!tgClientId) return;
+const failed = ref(false);
+
+function initWidget() {
+  (window as any).Telegram.Login.init(
+    { client_id: Number(tgClientId), scope: ["profile", "write"] },
+    onAuth,
+  );
+  ready.value = true;
+}
+
+function mountWidget() {
+  failed.value = false;
+  // Script may already be present from a previous visit to this page.
+  if ((window as any).Telegram?.Login) {
+    initWidget();
+    return;
+  }
   const script = document.createElement("script");
   script.src = "https://oauth.telegram.org/js/telegram-login.js?5";
   script.async = true;
   script.onload = () => {
-    (window as any).Telegram?.Login?.init(
-      { client_id: Number(tgClientId), scope: ["profile", "write"] },
-      onAuth,
-    );
-    ready.value = true;
+    if ((window as any).Telegram?.Login) initWidget();
+    else failed.value = true;
+  };
+  script.onerror = () => {
+    script.remove();
+    failed.value = true;
   };
   document.head.appendChild(script);
+}
+
+onMounted(() => {
+  if (tgClientId) mountWidget();
 });
 </script>
 
 <template>
   <div class="flex flex-col items-center gap-3">
-    <UButton
-      v-if="tgClientId"
-      size="xl"
-      icon="i-lucide-send"
-      label="Sign in with Telegram"
-      :loading="!ready"
-      @click="openLogin"
-    />
+    <template v-if="tgClientId">
+      <UButton
+        v-if="!failed"
+        size="xl"
+        icon="i-lucide-send"
+        label="Sign in with Telegram"
+        :loading="!ready"
+        @click="openLogin"
+      />
+      <template v-else>
+        <UButton
+          size="xl"
+          icon="i-lucide-refresh-cw"
+          label="Retry Telegram login"
+          color="neutral"
+          variant="subtle"
+          @click="mountWidget"
+        />
+        <p class="max-w-xs text-center text-xs text-muted">
+          The Telegram widget could not load — check your connection or ad blocker.
+        </p>
+      </template>
+    </template>
     <UButton
       v-else
       icon="i-lucide-flask-conical"

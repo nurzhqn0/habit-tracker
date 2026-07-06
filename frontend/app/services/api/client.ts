@@ -23,31 +23,51 @@ function apiBaseURL(): string {
   return config.public.apiBase;
 }
 
+export function statusOf(error: unknown): number | undefined {
+  return (
+    (error as { statusCode?: number })?.statusCode ??
+    (error as { response?: { status?: number } })?.response?.status
+  );
+}
+
+type Tokens = ReturnType<typeof useAuthTokens>;
+
+// Composables (useCookie/useRuntimeConfig) are only safe in the synchronous
+// part of a request on the server, so apiBase and token refs are captured at
+// apiFetch entry and passed down — never resolved after an await.
+async function doRefresh(apiBase: string, tokens: Tokens): Promise<boolean> {
+  if (!tokens.refresh.value) return false;
+
+  try {
+    const response = await $fetch<TokenResponse>("/auth/refresh", {
+      baseURL: apiBase,
+      method: "POST",
+      body: { refresh_token: tokens.refresh.value },
+    });
+    tokens.access.value = response.access_token;
+    tokens.refresh.value = response.refresh_token;
+    return true;
+  } catch (error) {
+    // Only a definitive rejection ends the session. Transient failures
+    // (network, 5xx, 429) keep the tokens so a later request can retry.
+    const status = statusOf(error);
+    if (status === 401 || status === 403) {
+      tokens.access.value = null;
+      tokens.refresh.value = null;
+    }
+    return false;
+  }
+}
+
 let refreshing: Promise<boolean> | null = null;
 
-async function tryRefresh(): Promise<boolean> {
-  const apiBase = apiBaseURL();
-  const { access, refresh } = useAuthTokens();
-  if (!refresh.value) return false;
-
-  refreshing ??= (async () => {
-    try {
-      const response = await $fetch<TokenResponse>("/auth/refresh", {
-        baseURL: apiBase,
-        method: "POST",
-        body: { refresh_token: refresh.value },
-      });
-      access.value = response.access_token;
-      refresh.value = response.refresh_token;
-      return true;
-    } catch {
-      access.value = null;
-      refresh.value = null;
-      return false;
-    } finally {
-      refreshing = null;
-    }
-  })();
+async function tryRefresh(apiBase: string, tokens: Tokens): Promise<boolean> {
+  // The server runtime is shared across concurrent requests of different
+  // users — never share an in-flight refresh promise there.
+  if (import.meta.server) return doRefresh(apiBase, tokens);
+  refreshing ??= doRefresh(apiBase, tokens).finally(() => {
+    refreshing = null;
+  });
   return refreshing;
 }
 
@@ -57,7 +77,7 @@ export async function apiFetch<T>(
   options: Parameters<typeof $fetch>[1] = {},
 ): Promise<T> {
   const apiBase = apiBaseURL();
-  const { access } = useAuthTokens();
+  const tokens = useAuthTokens();
 
   const doFetch = () =>
     $fetch<T>(path, {
@@ -65,16 +85,14 @@ export async function apiFetch<T>(
       ...options,
       headers: {
         ...(options.headers as Record<string, string> | undefined),
-        ...(access.value ? { Authorization: `Bearer ${access.value}` } : {}),
+        ...(tokens.access.value ? { Authorization: `Bearer ${tokens.access.value}` } : {}),
       },
     });
 
   try {
     return (await doFetch()) as T;
   } catch (error: unknown) {
-    const status = (error as { statusCode?: number; response?: { status?: number } })?.statusCode
-      ?? (error as { response?: { status?: number } })?.response?.status;
-    if (status === 401 && (await tryRefresh())) {
+    if (statusOf(error) === 401 && (await tryRefresh(apiBase, tokens))) {
       return (await doFetch()) as T;
     }
     throw error;

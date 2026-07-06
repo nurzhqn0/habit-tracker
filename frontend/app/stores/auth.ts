@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import type { TokenResponse, User } from "~~/shared/types/api";
-import { apiFetch, useAuthTokens } from "~/services/api/client";
+import { apiFetch, statusOf, useAuthTokens } from "~/services/api/client";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -37,8 +37,12 @@ export const useAuthStore = defineStore("auth", {
       if (access.value || refresh.value) {
         try {
           this.user = await apiFetch<User>("/me");
-        } catch {
+        } catch (error) {
           this.user = null;
+          const status = statusOf(error);
+          // Transient failure (network, 5xx): stay not-ready so the next
+          // navigation retries instead of treating it as logged out.
+          if (status !== 401 && status !== 403) return;
         }
       }
       this.ready = true;
