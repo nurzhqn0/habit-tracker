@@ -175,7 +175,12 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 
         <UCard>
           <template #header>
-            <p class="font-semibold text-highlighted">History</p>
+            <div class="flex items-center justify-between gap-2">
+              <p class="font-semibold text-highlighted">History</p>
+              <p class="text-xs text-muted">
+                {{ habit.type === 1 ? "Tap a day to edit its value" : "Tap a day to toggle" }}
+              </p>
+            </div>
           </template>
           <ChartsHistoryHeatmap v-if="heatmap" :data="heatmap" :color="color" @pick="onPickDay" />
         </UCard>

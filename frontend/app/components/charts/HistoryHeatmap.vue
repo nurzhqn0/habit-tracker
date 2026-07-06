@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { NO, SKIP, YES_AUTO, YES_MANUAL } from "~~/shared/types/habits";
-import { shiftDateKey } from "~/composables/useDates";
+import { SKIP, YES_AUTO, YES_MANUAL } from "~~/shared/types/habits";
+import { shiftDateKey, weekdayShort, dayOfMonth } from "~/composables/useDates";
 
 const props = defineProps<{
   data: {
@@ -19,7 +19,11 @@ const emit = defineEmits<{ pick: [date: string] }>();
 
 const weekCount = computed(() => props.weeks ?? 26);
 
-// Grid: one column per week, rows Mon..Sun (respecting first_weekday), ending at today.
+const CELL = 28; // px, matches size-7
+const GAP = 4; // px, matches gap-1
+const COL = CELL + GAP;
+
+// Grid: one column per week, rows ordered by first_weekday, ending at today.
 const columns = computed(() => {
   const { today, first_weekday } = props.data;
   const todayDate = new Date(today);
@@ -39,39 +43,50 @@ const columns = computed(() => {
   return result;
 });
 
+const weekdayLabels = computed(() => columns.value[0]?.map((c) => weekdayShort(c.date)) ?? []);
+
 function cellStyle(date: string, future: boolean): Record<string, string> {
   if (future) return { backgroundColor: "transparent" };
+  const halo =
+    date === props.data.today
+      ? { boxShadow: `0 0 0 1px var(--ui-bg), 0 0 0 3px ${props.color}` }
+      : {};
   const value = props.data.entries[date];
-  const base = { backgroundColor: "var(--ui-bg-elevated)" };
-  if (value === undefined) return base;
+  const empty = { backgroundColor: "var(--ui-bg-elevated)", color: "var(--ui-text-dimmed)", ...halo };
+  if (value === undefined) return empty;
 
   if (props.data.type === 1) {
-    if (value === SKIP || value < 0) return base;
+    if (value === SKIP || value < 0) return empty;
     const target = props.data.target_value * 1000;
     const ratio = target > 0 ? Math.min(1, value / target) : value > 0 ? 1 : 0;
     const strength = props.data.target_type === 1 ? (value <= target ? 1 : 0.25) : ratio;
-    if (strength <= 0) return base;
-    return { backgroundColor: props.color, opacity: String(0.25 + 0.75 * strength) };
+    if (strength <= 0) return empty;
+    return {
+      backgroundColor: `color-mix(in srgb, ${props.color} ${Math.round(25 + 75 * strength)}%, transparent)`,
+      color: strength >= 0.5 ? "white" : props.color,
+      ...halo,
+    };
   }
 
   switch (value) {
     case YES_MANUAL:
-      return { backgroundColor: props.color };
+      return { backgroundColor: props.color, color: "white", ...halo };
     case YES_AUTO:
-      return { backgroundColor: props.color, opacity: "0.45" };
+      return {
+        backgroundColor: `color-mix(in srgb, ${props.color} 45%, transparent)`,
+        color: "white",
+        ...halo,
+      };
     case SKIP:
-      return { backgroundColor: props.color, opacity: "0.25" };
-    case NO:
+      return {
+        backgroundColor: `color-mix(in srgb, ${props.color} 18%, transparent)`,
+        color: props.color,
+        ...halo,
+      };
     default:
-      return base;
+      return empty;
   }
 }
-
-// Newest data is at the right edge — start scrolled to it on narrow screens.
-const scroller = ref<HTMLElement | null>(null);
-onMounted(() => {
-  if (scroller.value) scroller.value.scrollLeft = scroller.value.scrollWidth;
-});
 
 const monthLabels = computed(() => {
   const labels: { index: number; label: string }[] = [];
@@ -79,41 +94,63 @@ const monthLabels = computed(() => {
   columns.value.forEach((column, index) => {
     const month = column[0]!.date.slice(0, 7);
     if (month !== last) {
-      labels.push({ index, label: column[0]!.date.slice(5, 7) });
+      const [y, m] = month.split("-").map(Number);
+      const name = new Date(y!, m! - 1, 1).toLocaleDateString(undefined, { month: "short" });
+      labels.push({ index, label: m === 1 ? `${name} ${y}` : name });
       last = month;
     }
   });
   return labels.slice(1); // skip partial first label
 });
+
+// Newest data is at the right edge — start scrolled to it on narrow screens.
+const scroller = ref<HTMLElement | null>(null);
+onMounted(() => {
+  if (scroller.value) scroller.value.scrollLeft = scroller.value.scrollWidth;
+});
 </script>
 
 <template>
-  <div ref="scroller" class="overflow-x-auto">
-    <div class="min-w-fit">
-      <div class="relative mb-1 h-3">
-        <span
-          v-for="m in monthLabels"
-          :key="m.index"
-          class="absolute text-[9px] text-dimmed"
-          :style="{ left: `${m.index * 14}px` }"
-        >
-          {{ m.label }}
-        </span>
-      </div>
-      <div class="flex gap-[3px]">
-        <div v-for="(column, ci) in columns" :key="ci" class="flex flex-col gap-[3px]">
-          <button
-            v-for="cell in column"
-            :key="cell.date"
-            type="button"
-            class="size-[11px] rounded-[3px] transition hover:ring-1 hover:ring-[var(--ui-border-accented)]"
-            :style="cellStyle(cell.date, cell.future)"
-            :title="cell.date"
-            :disabled="cell.future"
-            @click="emit('pick', cell.date)"
-          />
+  <div class="flex items-start gap-2">
+    <div ref="scroller" class="overflow-x-auto pb-1">
+      <div class="min-w-fit">
+        <div class="relative mb-1.5 h-4">
+          <span
+            v-for="m in monthLabels"
+            :key="m.index"
+            class="absolute text-[10px] font-medium whitespace-nowrap text-muted"
+            :style="{ left: `${m.index * COL}px` }"
+          >
+            {{ m.label }}
+          </span>
+        </div>
+        <div class="flex gap-1">
+          <div v-for="(column, ci) in columns" :key="ci" class="flex flex-col gap-1">
+            <button
+              v-for="cell in column"
+              :key="cell.date"
+              type="button"
+              class="flex size-7 items-center justify-center rounded-md text-[10px] font-medium tabular-nums transition hover:ring-2 hover:ring-[var(--ui-border-accented)] active:scale-90 disabled:cursor-default"
+              :style="cellStyle(cell.date, cell.future)"
+              :title="cell.date"
+              :disabled="cell.future"
+              :aria-label="cell.date"
+              @click="emit('pick', cell.date)"
+            >
+              {{ cell.future ? "" : dayOfMonth(cell.date) }}
+            </button>
+          </div>
         </div>
       </div>
+    </div>
+    <div class="mt-[22px] flex shrink-0 flex-col gap-1">
+      <span
+        v-for="(label, i) in weekdayLabels"
+        :key="i"
+        class="flex h-7 items-center text-[10px] text-muted"
+      >
+        {{ label }}
+      </span>
     </div>
   </div>
 </template>
