@@ -114,7 +114,11 @@ TEST_MODE=false
 
 ## 5. First start (HTTP only)
 
+`nginx/nginx.conf` is machine-local (gitignored) so your TLS edits survive `git pull`.
+Create it from the HTTP example first:
+
 ```bash
+cp nginx/nginx.conf.example nginx/nginx.conf
 docker compose up -d --build
 docker compose ps          # nginx, api, frontend "Up"; api "healthy"; bot "Up"
 curl -s localhost/health   # {"status":"ok"}
