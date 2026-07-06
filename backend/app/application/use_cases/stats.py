@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application import habit_math
 from app.domain.models.entry import SKIP, YES_MANUAL, Entry
 from app.domain.models.habit import Habit
-from app.domain.services.statistics import TruncateField, count_skipped_days, grouped_sum
+from app.domain.services.statistics import (
+    TruncateField,
+    compute_weekday_frequency,
+    count_skipped_days,
+    grouped_sum,
+)
 from app.domain.services.streak_engine import best_streaks
 from app.infrastructure.repositories.habit_repo import EntryRepo, HabitRepo
 from app.infrastructure.repositories.user_repo import UserRepo
@@ -119,6 +124,17 @@ async def weekdays(session: AsyncSession, user_id: int, habit_id: int) -> list[d
         elif e.value == YES_MANUAL:
             totals[e.date.weekday()] += 1
     return [{"weekday": i, "value": totals[i]} for i in range(7)]
+
+
+async def frequency(session: AsyncSession, user_id: int, habit_id: int) -> list[dict]:
+    """Per-month weekday totals for the frequency dot chart. Weekdays Sunday-first."""
+    ctx = await _context(session, user_id, habit_id)
+    by_month = compute_weekday_frequency(list(ctx.computed.values()), ctx.habit.is_numerical)
+    return [
+        # uhabits layout is Saturday=0, Sunday=1 .. Friday=6; rotate to Sunday-first.
+        {"month": month.isoformat()[:7], "weekdays": totals[1:] + totals[:1]}
+        for month, totals in sorted(by_month.items())
+    ]
 
 
 async def streaks(session: AsyncSession, user_id: int, habit_id: int, limit: int) -> list[dict]:

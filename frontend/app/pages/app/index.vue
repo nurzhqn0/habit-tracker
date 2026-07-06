@@ -14,7 +14,12 @@ const store = useHabitsStore();
 const toast = useToast();
 
 const prefs = ref<Preferences | null>(null);
-const dayCount = ref(7);
+const period = ref<"week" | "month">("week");
+const periodItems = [
+  { label: "Week", value: "week" },
+  { label: "Month", value: "month" },
+];
+const dayCount = computed(() => (period.value === "week" ? 7 : 31));
 const days = computed(() => lastNDateKeys(dayCount.value)); // newest first
 const today = todayKey();
 
@@ -42,6 +47,10 @@ async function load() {
 onMounted(async () => {
   prefs.value = await apiFetch<Preferences>("/me/preferences").catch(() => null);
   await load().catch(() => toast.add({ title: "Could not load habits", color: "error" }));
+});
+
+watch(period, () => {
+  load().catch(() => toast.add({ title: "Could not load habits", color: "error" }));
 });
 
 const sortItems = computed<DropdownMenuItem[]>(() =>
@@ -135,6 +144,7 @@ async function onDragEnd() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <USelect v-model="period" :items="periodItems" size="sm" class="w-24" aria-label="Period" />
           <UTooltip text="Include archived habits (shown dimmed)">
             <USwitch v-model="store.showArchived" label="Show archived" size="sm" @change="load" />
           </UTooltip>
@@ -164,8 +174,10 @@ async function onDragEnd() {
       <div v-else class="overflow-x-auto">
         <div class="min-w-fit">
           <div class="flex items-center gap-2 border-b border-default pb-2">
-            <div class="w-6 shrink-0" />
-            <div class="min-w-40 flex-1" />
+            <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
+              <div class="w-6 shrink-0" />
+              <div class="min-w-40 flex-1" />
+            </div>
             <div
               v-for="date in days"
               :key="date"
@@ -192,29 +204,31 @@ async function onDragEnd() {
                 class="flex items-center gap-2 border-b border-default py-1"
                 :class="item.habit.archived ? 'opacity-50' : ''"
               >
-                <UIcon
-                  name="i-lucide-grip-vertical"
-                  class="drag-handle w-6 shrink-0 text-dimmed"
-                  :class="dragEnabled ? 'cursor-grab' : 'opacity-20'"
-                />
+                <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
+                  <UIcon
+                    name="i-lucide-grip-vertical"
+                    class="drag-handle w-6 shrink-0 text-dimmed"
+                    :class="dragEnabled ? 'cursor-grab' : 'opacity-20'"
+                  />
 
-                <NuxtLink
-                  :to="`/app/habits/${item.habit.id}`"
-                  class="flex min-w-40 flex-1 items-center gap-3"
-                >
-                  <HabitScoreRing :score="item.score" :color="paletteColor(item.habit.color)" />
-                  <div class="min-w-0">
-                    <p
-                      class="truncate text-sm font-medium"
-                      :style="{ color: paletteColor(item.habit.color) }"
-                    >
-                      {{ item.habit.name }}
-                    </p>
-                    <p v-if="item.streak > 1" class="flex items-center gap-1 text-xs text-muted">
-                      <UIcon name="i-lucide-flame" class="size-3" />{{ item.streak }} days
-                    </p>
-                  </div>
-                </NuxtLink>
+                  <NuxtLink
+                    :to="`/app/habits/${item.habit.id}`"
+                    class="flex min-w-40 flex-1 items-center gap-3"
+                  >
+                    <HabitScoreRing :score="item.score" :color="paletteColor(item.habit.color)" />
+                    <div class="min-w-0">
+                      <p
+                        class="truncate text-sm font-medium"
+                        :style="{ color: paletteColor(item.habit.color) }"
+                      >
+                        {{ item.habit.name }}
+                      </p>
+                      <p v-if="item.streak > 1" class="flex items-center gap-1 text-xs text-muted">
+                        <UIcon name="i-lucide-flame" class="size-3" />{{ item.streak }} days
+                      </p>
+                    </div>
+                  </NuxtLink>
+                </div>
 
                 <template v-for="date in days" :key="date">
                   <HabitNumberCell

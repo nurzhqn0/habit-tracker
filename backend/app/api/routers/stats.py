@@ -46,6 +46,11 @@ async def weekdays(habit_id: int, user: CurrentUserDep, session: SessionDep) -> 
     return await stats_uc.weekdays(session, user.id, habit_id)
 
 
+@router.get("/frequency")
+async def frequency(habit_id: int, user: CurrentUserDep, session: SessionDep) -> list[dict]:
+    return await stats_uc.frequency(session, user.id, habit_id)
+
+
 @router.get("/streaks")
 async def streaks(
     habit_id: int, user: CurrentUserDep, session: SessionDep, limit: int = Query(default=10, le=50)

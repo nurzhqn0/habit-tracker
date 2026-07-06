@@ -112,11 +112,27 @@ async def test_notes_card(client):
     assert body == [{"date": str(TODAY), "value": 2, "notes": "great session", "skip": False}]
 
 
+async def test_frequency_endpoint(client):
+    headers = bearer(await login(client, 3009))
+    habit = (await client.post("/habits", json={"name": "Pray"}, headers=headers)).json()
+    # Fixed dates with known weekdays: 2026-05-30 Sat; 2026-06-01, 2026-06-08 Mon; 2026-06-07 Sun.
+    for d in ("2026-05-30", "2026-06-01", "2026-06-08", "2026-06-07"):
+        await client.post(f"/habits/{habit['id']}/entries/{d}/toggle", headers=headers)
+
+    body = (await client.get(f"/habits/{habit['id']}/stats/frequency", headers=headers)).json()
+    assert [m["month"] for m in body] == ["2026-05", "2026-06"]
+    # weekdays are Sunday-first: [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
+    assert body[0]["weekdays"] == [0, 0, 0, 0, 0, 0, 1]
+    assert body[1]["weekdays"] == [1, 2, 0, 0, 0, 0, 0]
+
+
 async def test_stats_cross_user_denied(client):
     headers_a = bearer(await login(client, 3007))
     headers_b = bearer(await login(client, 3008))
     habit = await seeded_habit(client, headers_a, days=1)
 
-    for endpoint in ("overview", "scores", "history", "bar", "weekdays", "streaks", "target", "notes"):
+    for endpoint in (
+        "overview", "scores", "history", "bar", "weekdays", "frequency", "streaks", "target", "notes",
+    ):
         response = await client.get(f"/habits/{habit['id']}/stats/{endpoint}", headers=headers_b)
         assert response.status_code == 404, endpoint

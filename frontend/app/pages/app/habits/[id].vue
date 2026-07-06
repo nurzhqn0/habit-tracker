@@ -17,6 +17,7 @@ const scorePoints = ref<{ date: string; value: number }[]>([]);
 const heatmap = ref<any>(null);
 const bars = ref<{ date: string; value: number }[]>([]);
 const weekdays = ref<{ weekday: number; value: number }[]>([]);
+const frequencyMonths = ref<{ month: string; weekdays: number[] }[]>([]);
 const streaks = ref<{ start: string; end: string; length: number }[]>([]);
 const targetRows = ref<{ period: string; actual: number; target: number }[]>([]);
 const notes = ref<{ date: string; value: number; notes: string }[]>([]);
@@ -56,15 +57,17 @@ async function loadAll() {
   loading.value = true;
   try {
     habit.value = await apiFetch<Habit>(`/habits/${habitId}`);
-    [overview.value, heatmap.value, weekdays.value, streaks.value, notes.value] = await Promise.all([
-      apiFetch(`/habits/${habitId}/stats/overview`),
-      apiFetch(`/habits/${habitId}/stats/history`),
-      apiFetch(`/habits/${habitId}/stats/weekdays`),
-      apiFetch(`/habits/${habitId}/stats/streaks`),
-      apiFetch(`/habits/${habitId}/stats/notes`),
-      loadScores(),
-      loadBars(),
-    ]);
+    [overview.value, heatmap.value, weekdays.value, frequencyMonths.value, streaks.value, notes.value] =
+      await Promise.all([
+        apiFetch(`/habits/${habitId}/stats/overview`),
+        apiFetch(`/habits/${habitId}/stats/history`),
+        apiFetch(`/habits/${habitId}/stats/weekdays`),
+        apiFetch(`/habits/${habitId}/stats/frequency`),
+        apiFetch(`/habits/${habitId}/stats/streaks`),
+        apiFetch(`/habits/${habitId}/stats/notes`),
+        loadScores(),
+        loadBars(),
+      ]);
     if (habit.value?.type === 1) {
       targetRows.value = await apiFetch(`/habits/${habitId}/stats/target`);
     }
@@ -80,10 +83,35 @@ onMounted(loadAll);
 watch(scoreBucket, loadScores);
 watch(barBucket, loadBars);
 
+const valueDate = ref<string | null>(null);
+const valueInput = ref("");
+
 async function onPickDay(date: string) {
-  if (!habit.value || habit.value.type === 1) return;
+  if (!habit.value) return;
+  if (habit.value.type === 1) {
+    const stored = heatmap.value?.entries?.[date];
+    valueInput.value = stored !== undefined && stored >= 0 ? String(stored / 1000) : "";
+    valueDate.value = date;
+    return;
+  }
   try {
     await apiFetch(`/habits/${habitId}/entries/${date}/toggle`, { method: "POST" });
+    await loadAll();
+  } catch {
+    toast.add({ title: "Could not save entry", color: "error" });
+  }
+}
+
+async function saveValue() {
+  const date = valueDate.value;
+  const parsed = Number(valueInput.value);
+  if (!date || !Number.isFinite(parsed) || parsed < 0) return;
+  valueDate.value = null;
+  try {
+    await apiFetch(`/habits/${habitId}/entries/${date}`, {
+      method: "PUT",
+      body: { value: Math.round(parsed * 1000) },
+    });
     await loadAll();
   } catch {
     toast.add({ title: "Could not save entry", color: "error" });
@@ -171,6 +199,17 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
           </UCard>
         </div>
 
+        <UCard>
+          <template #header>
+            <p class="font-semibold text-highlighted">Frequency</p>
+          </template>
+          <ChartsFrequencyChart
+            :months="frequencyMonths"
+            :color="color"
+            :is-numerical="habit.type === 1"
+          />
+        </UCard>
+
         <UCard v-if="habit.type === 1">
           <template #header>
             <p class="font-semibold text-highlighted">Target</p>
@@ -201,6 +240,29 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
       </div>
 
       <HabitFormModal v-model:open="editOpen" :habit="habit ?? undefined" @saved="loadAll" />
+
+      <UModal
+        :open="valueDate !== null"
+        :title="valueDate ?? ''"
+        description="Set the value for this day."
+        @update:open="(open: boolean) => { if (!open) valueDate = null; }"
+      >
+        <template #body>
+          <form class="flex items-center gap-2" @submit.prevent="saveValue">
+            <UInput
+              v-model="valueInput"
+              type="number"
+              step="any"
+              min="0"
+              autofocus
+              :placeholder="`0 ${habit?.unit ?? ''}`"
+              class="flex-1"
+            />
+            <span v-if="habit?.unit" class="text-xs text-muted">{{ habit.unit }}</span>
+            <UButton type="submit" icon="i-lucide-check" label="Save" />
+          </form>
+        </template>
+      </UModal>
 
       <UModal
         v-model:open="deleteOpen"
