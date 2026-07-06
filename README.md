@@ -84,6 +84,9 @@ and the Playwright e2e smoke on every push/PR.
 The Telegram Login Widget requires your domain to be linked to the bot via
 [@BotFather](https://t.me/BotFather) → `/setdomain`.
 
+**Full VPS walkthrough** (blank Ubuntu server → live HTTPS deployment, certs,
+bot setup, backups, updates): see [DEPLOY.md](DEPLOY.md).
+
 ## Architecture notes
 
 - Scores, streaks, and auto-filled entries are **derived, never persisted** — SQLite
