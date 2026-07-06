@@ -188,7 +188,7 @@ const tabs = [
 <template>
   <UDashboardPanel id="room-detail">
     <template #header>
-      <UDashboardNavbar :title="room?.name ?? 'Room'">
+      <UDashboardNavbar :title="room?.name ?? 'Room'" :toggle="false">
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app/rooms" aria-label="Back" />
         </template>

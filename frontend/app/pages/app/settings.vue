@@ -85,7 +85,7 @@ const botLink = computed(() => (botUsername ? `https://t.me/${botUsername}?start
 <template>
   <UDashboardPanel id="settings">
     <template #header>
-      <UDashboardNavbar title="Settings">
+      <UDashboardNavbar title="Settings" :toggle="false">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>

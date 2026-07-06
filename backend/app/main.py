@@ -1,20 +1,25 @@
 from contextlib import asynccontextmanager
 
+from aiogram import Bot
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
-from app.api.routers import auth, export, habits, me, rooms, stats
+from app.api.routers import auth, avatars, export, habits, me, rooms, stats
 from app.config import get_settings
 from app.infrastructure.db.base import create_engine, create_session_factory
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
     engine = create_engine()
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
+    app.state.bot = Bot(token=settings.bot_token) if settings.bot_token else None
     yield
+    if app.state.bot is not None:
+        await app.state.bot.session.close()
     await engine.dispose()
 
 
@@ -70,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(stats.router, prefix="/api/v1")
     app.include_router(export.router, prefix="/api/v1")
     app.include_router(rooms.router, prefix="/api/v1")
+    app.include_router(avatars.router, prefix="/api/v1")
 
     return app
 

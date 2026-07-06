@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class TelegramLoginRequest(BaseModel):
@@ -18,6 +18,11 @@ class UserOut(BaseModel):
     first_name: str
     photo_url: str | None
     bot_linked: bool
+
+    @model_validator(mode="after")
+    def _avatar_proxy_url(self) -> "UserOut":
+        self.photo_url = f"/api/v1/avatars/{self.id}"
+        return self
 
 
 class TokenResponse(BaseModel):

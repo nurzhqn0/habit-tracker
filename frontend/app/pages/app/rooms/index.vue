@@ -64,7 +64,7 @@ async function joinRoom() {
 <template>
   <UDashboardPanel id="rooms">
     <template #header>
-      <UDashboardNavbar title="Rooms">
+      <UDashboardNavbar title="Rooms" :toggle="false">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>

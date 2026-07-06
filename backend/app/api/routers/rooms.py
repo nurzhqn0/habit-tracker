@@ -71,7 +71,7 @@ async def members(room_id: int, user: CurrentUserDep, session: SessionDep) -> li
     return [
         MemberOut(
             user_id=u.id, first_name=u.first_name, username=u.username,
-            photo_url=u.photo_url, role=m.role, joined_at=m.joined_at,
+            photo_url=f"/api/v1/avatars/{u.id}", role=m.role, joined_at=m.joined_at,
         )
         for m, u in await RoomRepo(session).members_with_users(room_id)
     ]
@@ -183,7 +183,7 @@ async def feed(
             id=e.id,
             user_id=e.user_id,
             first_name=users[e.user_id].first_name if e.user_id in users else "Unknown",
-            photo_url=users[e.user_id].photo_url if e.user_id in users else None,
+            photo_url=f"/api/v1/avatars/{e.user_id}",
             type=e.type,
             room_habit_id=e.room_habit_id,
             room_habit_name=habits[e.room_habit_id].name if e.room_habit_id in habits else None,

@@ -105,7 +105,7 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 <template>
   <UDashboardPanel id="habit-detail">
     <template #header>
-      <UDashboardNavbar :title="habit?.name ?? 'Habit'">
+      <UDashboardNavbar :title="habit?.name ?? 'Habit'" :toggle="false">
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app" aria-label="Back" />
         </template>

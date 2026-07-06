@@ -130,7 +130,7 @@ async function onDragEnd() {
 <template>
   <UDashboardPanel id="habits">
     <template #header>
-      <UDashboardNavbar title="Habits">
+      <UDashboardNavbar title="Habits" :toggle="false">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
