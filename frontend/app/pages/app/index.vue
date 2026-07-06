@@ -146,12 +146,19 @@ async function onDragEnd() {
         <template #right>
           <USelect v-model="period" :items="periodItems" size="sm" class="w-24" aria-label="Period" />
           <UTooltip text="Include archived habits (shown dimmed)">
-            <USwitch v-model="store.showArchived" label="Show archived" size="sm" @change="load" />
+            <USwitch
+              v-model="store.showArchived"
+              label="Show archived"
+              size="sm"
+              :ui="{ label: 'hidden sm:block' }"
+              @change="load"
+            />
           </UTooltip>
           <UDropdownMenu :items="sortItems">
             <UButton icon="i-lucide-arrow-up-down" color="neutral" variant="ghost" aria-label="Sort" />
           </UDropdownMenu>
-          <UButton icon="i-lucide-plus" label="New habit" @click="openCreate" />
+          <UButton icon="i-lucide-plus" label="New habit" class="hidden sm:inline-flex" @click="openCreate" />
+          <UButton icon="i-lucide-plus" aria-label="New habit" class="sm:hidden" @click="openCreate" />
         </template>
       </UDashboardNavbar>
     </template>
@@ -176,7 +183,7 @@ async function onDragEnd() {
           <div class="flex items-center gap-2 border-b border-default pb-2">
             <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
               <div class="w-6 shrink-0" />
-              <div class="min-w-40 flex-1" />
+              <div class="min-w-28 flex-1 sm:min-w-40" />
             </div>
             <div
               v-for="date in days"
@@ -213,7 +220,7 @@ async function onDragEnd() {
 
                   <NuxtLink
                     :to="`/app/habits/${item.habit.id}`"
-                    class="flex min-w-40 flex-1 items-center gap-3"
+                    class="flex min-w-28 flex-1 items-center gap-3 sm:min-w-40"
                   >
                     <HabitScoreRing :score="item.score" :color="paletteColor(item.habit.color)" />
                     <div class="min-w-0">

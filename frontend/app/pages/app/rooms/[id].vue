@@ -326,7 +326,13 @@ const tabs = [
         <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
       </div>
 
-      <UTabs v-else :items="tabs" class="w-full" variant="link">
+      <UTabs
+        v-else
+        :items="tabs"
+        class="w-full"
+        variant="link"
+        :ui="{ list: 'overflow-x-auto', trigger: 'flex-none' }"
+      >
         <template #habits>
           <div class="flex flex-col gap-3 pt-4">
             <div v-if="isAdmin" class="flex justify-end">

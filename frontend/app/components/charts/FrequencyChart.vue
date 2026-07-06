@@ -27,12 +27,24 @@ function monthLabel(month: string): string {
 
 const width = computed(() => props.months.length * CELL);
 const HEIGHT = 7 * CELL;
+
+// Newest month is at the right edge — start scrolled to it on narrow screens.
+// Data arrives after mount, so watch it instead of onMounted.
+const scroller = ref<HTMLElement | null>(null);
+watch(
+  () => props.months,
+  async () => {
+    await nextTick();
+    if (scroller.value) scroller.value.scrollLeft = scroller.value.scrollWidth;
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
   <p v-if="months.length === 0" class="text-sm text-muted">No entries yet.</p>
   <div v-else class="flex items-start gap-2">
-    <div class="overflow-x-auto">
+    <div ref="scroller" class="overflow-x-auto">
       <svg :width="width" :height="HEIGHT + 16" class="block">
         <g v-for="(m, ci) in months" :key="m.month">
           <circle

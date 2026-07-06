@@ -67,6 +67,12 @@ function cellStyle(date: string, future: boolean): Record<string, string> {
   }
 }
 
+// Newest data is at the right edge — start scrolled to it on narrow screens.
+const scroller = ref<HTMLElement | null>(null);
+onMounted(() => {
+  if (scroller.value) scroller.value.scrollLeft = scroller.value.scrollWidth;
+});
+
 const monthLabels = computed(() => {
   const labels: { index: number; label: string }[] = [];
   let last = "";
@@ -82,7 +88,7 @@ const monthLabels = computed(() => {
 </script>
 
 <template>
-  <div class="overflow-x-auto">
+  <div ref="scroller" class="overflow-x-auto">
     <div class="min-w-fit">
       <div class="relative mb-1 h-3">
         <span
