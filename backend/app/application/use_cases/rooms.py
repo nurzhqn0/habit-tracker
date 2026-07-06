@@ -87,7 +87,7 @@ async def invite_by_username(
         return "not_registered", uname
     if await RoomRepo(session).membership(room_id, target.id) is not None:
         return "already_member", uname
-    if bot is None or not target.bot_linked:
+    if bot is None:
         return "not_linked", uname
 
     from aiogram.exceptions import TelegramAPIError
@@ -105,6 +105,10 @@ async def invite_by_username(
         )
     except TelegramAPIError:
         return "not_linked", uname
+    if not target.bot_linked:
+        # Delivery succeeded, so the user has started the bot; heal a stale flag.
+        target.bot_linked = True
+        await session.commit()
     return "sent", uname
 
 
