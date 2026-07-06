@@ -1,15 +1,18 @@
 from typing import Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, SessionDep, SettingsDep
 from app.api.schemas.rooms import (
     FeedEventOut,
+    InviteByUsernameOut,
+    InviteByUsernameRequest,
     JoinRequest,
     LeaderboardRowOut,
     LinkRequest,
     MemberOut,
+    MemberRolePatch,
     RoomCreate,
     RoomHabitCreate,
     RoomHabitOut,
@@ -17,6 +20,7 @@ from app.api.schemas.rooms import (
     RoomHabitWithLinkOut,
     RoomOut,
     RoomPatch,
+    TransferRequest,
 )
 from app.application.use_cases import rooms as rooms_uc
 from app.infrastructure.db.tables import RoomHabitRow, UserRow
@@ -65,6 +69,24 @@ async def rotate_invite(
     return {"invite_code": code, "link": f"{settings.frontend_origin}/app/rooms/join/{code}"}
 
 
+@router.post("/{room_id}/invite", response_model=InviteByUsernameOut)
+async def invite_by_username(
+    room_id: int,
+    body: InviteByUsernameRequest,
+    request: Request,
+    user: CurrentUserDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> InviteByUsernameOut:
+    room = await rooms_uc._require_admin(session, room_id, user.id)
+    link = f"{settings.frontend_origin}/app/rooms/join/{room.invite_code}"
+    bot = getattr(request.app.state, "bot", None)
+    status, username = await rooms_uc.invite_by_username(
+        session, bot, user.id, room_id, body.username, link
+    )
+    return InviteByUsernameOut(status=status, username=username, link=link)
+
+
 @router.get("/{room_id}/members", response_model=list[MemberOut])
 async def members(room_id: int, user: CurrentUserDep, session: SessionDep) -> list[MemberOut]:
     await rooms_uc._require_member(session, room_id, user.id)
@@ -82,6 +104,20 @@ async def remove_member(
     room_id: int, target_user_id: int, user: CurrentUserDep, session: SessionDep
 ) -> None:
     await rooms_uc.remove_member(session, user.id, room_id, target_user_id)
+
+
+@router.patch("/{room_id}/members/{target_user_id}", status_code=204)
+async def set_member_role(
+    room_id: int, target_user_id: int, body: MemberRolePatch, user: CurrentUserDep, session: SessionDep
+) -> None:
+    await rooms_uc.set_member_role(session, user.id, room_id, target_user_id, body.role)
+
+
+@router.post("/{room_id}/transfer-ownership", response_model=RoomOut)
+async def transfer_ownership(
+    room_id: int, body: TransferRequest, user: CurrentUserDep, session: SessionDep
+) -> RoomOut:
+    return await rooms_uc.transfer_ownership(session, user.id, room_id, body.user_id)
 
 
 @router.post("/{room_id}/habits", response_model=RoomHabitOut, status_code=201)

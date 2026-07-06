@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,6 +36,24 @@ class MemberOut(BaseModel):
     photo_url: str | None
     role: str
     joined_at: datetime
+
+
+class MemberRolePatch(BaseModel):
+    role: Literal["admin", "member"]
+
+
+class InviteByUsernameRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+
+
+class InviteByUsernameOut(BaseModel):
+    status: Literal["sent", "not_linked", "not_registered", "already_member"]
+    username: str
+    link: str
+
+
+class TransferRequest(BaseModel):
+    user_id: int
 
 
 class RoomHabitCreate(BaseModel):

@@ -10,6 +10,7 @@ import io
 import re
 import zipfile
 from datetime import date as Date
+from datetime import timedelta
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -158,34 +159,57 @@ def _append_summary(workbook: Workbook, prepared: list, today: Date) -> None:
         ws.cell(row=ws.max_row, column=3).number_format = "0.0%"
 
 
-def _append_period_sheets(workbook: Workbook, prepared: list) -> None:
+def _append_period_sheets(workbook: Workbook, prepared: list, today: Date) -> None:
     for sheet_name, period_header, key_fn in (
         ("Weekly", "Week", _week_key),
         ("Monthly", "Month", _month_key),
     ):
         ws = workbook.create_sheet(sheet_name)
-        ws.append(["Habit", period_header, "Completions", "Total value", "Avg score"])
+        ws.append([
+            "Habit", period_header, "Completions", "Success rate",
+            "Total value", "Daily average", "Avg score",
+        ])
         for row, habit, computed, scores in prepared:
+            known = get_known(computed)
             buckets: dict[str, dict] = {}
-            for entry in get_known(computed):
-                bucket = buckets.setdefault(key_fn(entry.date), {"completions": 0, "total": 0.0})
+            for entry in known:
+                bucket = buckets.setdefault(
+                    key_fn(entry.date), {"completions": 0, "total": 0.0, "entry_days": 0}
+                )
                 if _is_completed(row, entry.value):
                     bucket["completions"] += 1
                 if row.type == 1 and entry.value >= 0:
                     bucket["total"] += entry.value / 1000
+                    bucket["entry_days"] += 1
+            # Days each period was active (first entry..today), skipped days excluded.
+            expected_days: dict[str, int] = {}
+            if known:
+                day = known[-1].date
+                while day <= today:
+                    entry = computed.get(day)
+                    if entry is None or entry.value != SKIP:
+                        expected_days[key_fn(day)] = expected_days.get(key_fn(day), 0) + 1
+                    day += timedelta(days=1)
             score_buckets: dict[str, list[float]] = {}
             for date, value in scores.items():
                 score_buckets.setdefault(key_fn(date), []).append(value)
-            for key in sorted(buckets):
+            for key in sorted(set(buckets) | set(expected_days)):
+                bucket = buckets.get(key, {"completions": 0, "total": 0.0, "entry_days": 0})
+                expected = expected_days.get(key, 0) * row.freq_num / row.freq_den
                 values = score_buckets.get(key, [])
                 ws.append([
                     row.name,
                     key,
-                    buckets[key]["completions"],
-                    round(buckets[key]["total"], 2) if row.type == 1 else "",
+                    bucket["completions"],
+                    min(1.0, bucket["completions"] / expected) if expected > 0 else "",
+                    round(bucket["total"], 2) if row.type == 1 else "",
+                    round(bucket["total"] / bucket["entry_days"], 2)
+                    if row.type == 1 and bucket["entry_days"]
+                    else "",
                     sum(values) / len(values) if values else 0.0,
                 ])
-                ws.cell(row=ws.max_row, column=5).number_format = "0.0%"
+                ws.cell(row=ws.max_row, column=4).number_format = "0.0%"
+                ws.cell(row=ws.max_row, column=7).number_format = "0.0%"
 
 
 def _style_headers(workbook: Workbook) -> None:
@@ -193,6 +217,9 @@ def _style_headers(workbook: Workbook) -> None:
         for cell in ws[1]:
             cell.font = Font(bold=True)
         ws.freeze_panes = "A2"
+        ws.column_dimensions["A"].width = 28
+        for letter in "BCDEFGHIJ":
+            ws.column_dimensions[letter].width = 14
 
 
 async def export_xlsx(session: AsyncSession, user_id: int, habit_id: int | None = None) -> bytes:
@@ -221,7 +248,7 @@ async def export_xlsx(session: AsyncSession, user_id: int, habit_id: int | None 
         prepared.append((row, habit, computed, scores))
 
     _append_summary(workbook, prepared, today)
-    _append_period_sheets(workbook, prepared)
+    _append_period_sheets(workbook, prepared, today)
 
     used_titles = {"Habits", "Summary", "Weekly", "Monthly"}
     for index, (row, habit, computed, scores) in enumerate(prepared):

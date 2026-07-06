@@ -16,7 +16,7 @@ function isActive(to: string): boolean {
 </script>
 
 <template>
-  <UDashboardGroup class="pb-14 lg:pb-0">
+  <UDashboardGroup>
     <UDashboardSidebar collapsible :min-size="14" :default-size="18">
       <template #header="{ collapsed }">
         <NuxtLink to="/app" class="flex items-center gap-2 font-bold text-highlighted">

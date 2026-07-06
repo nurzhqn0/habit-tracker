@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from "@nuxt/ui";
 import type { FeedEvent, LeaderboardRow, Room, RoomHabitWithLink, RoomMember } from "~~/shared/types/rooms";
 import type { Habit } from "~~/shared/types/habits";
 import { apiFetch } from "~/services/api/client";
@@ -23,6 +24,8 @@ const period = ref<"week" | "month" | "all">("week");
 const loading = ref(true);
 
 const isOwner = computed(() => room.value?.owner_id === auth.user?.id);
+const myRole = computed(() => members.value.find((m) => m.user_id === auth.user?.id)?.role);
+const isAdmin = computed(() => isOwner.value || myRole.value === "admin");
 
 useHead({ title: computed(() => room.value?.name ?? "Room") });
 
@@ -78,25 +81,89 @@ async function showInvite() {
     { method: "POST" },
   );
   inviteLink.value = result.link;
+  inviteUsername.value = "";
+  inviteResult.value = null;
   inviteOpen.value = true;
 }
+
+interface InviteResult {
+  status: "sent" | "not_linked" | "not_registered" | "already_member";
+  username: string;
+  link: string;
+}
+
+const inviteUsername = ref("");
+const inviteBusy = ref(false);
+const inviteResult = ref<InviteResult | null>(null);
+
+async function sendUsernameInvite() {
+  if (!inviteUsername.value.trim()) return;
+  inviteBusy.value = true;
+  try {
+    inviteResult.value = await apiFetch<InviteResult>(`/rooms/${roomId}/invite`, {
+      method: "POST",
+      body: { username: inviteUsername.value },
+    });
+  } catch {
+    toast.add({ title: "Could not send invite", color: "error" });
+  } finally {
+    inviteBusy.value = false;
+  }
+}
+
+const inviteShareUrl = computed(() => {
+  if (!inviteResult.value) return "";
+  const text = `Join “${room.value?.name}” on HabitFlow!`;
+  return `https://t.me/share/url?url=${encodeURIComponent(inviteResult.value.link)}&text=${encodeURIComponent(text)}`;
+});
 
 async function copyInvite() {
   await navigator.clipboard.writeText(inviteLink.value);
   toast.add({ title: "Invite link copied", color: "success" });
 }
 
-async function createRoomHabit() {
+const editingHabitId = ref<number | null>(null);
+
+function openHabitForm(item?: RoomHabitWithLink) {
+  editingHabitId.value = item?.habit.id ?? null;
+  newHabit.name = item?.habit.name ?? "";
+  newHabit.type = item?.habit.type ?? 0;
+  newHabit.target_value = item?.habit.target_value ?? 0;
+  newHabit.unit = item?.habit.unit ?? "";
+  newHabit.freq_num = item?.habit.freq_num ?? 1;
+  newHabit.freq_den = item?.habit.freq_den ?? 1;
+  habitFormOpen.value = true;
+}
+
+async function saveRoomHabit() {
   busy.value = true;
   try {
-    await apiFetch(`/rooms/${roomId}/habits`, { method: "POST", body: { ...newHabit } });
+    if (editingHabitId.value) {
+      const { type, ...fields } = newHabit;
+      await apiFetch(`/rooms/${roomId}/habits/${editingHabitId.value}`, { method: "PATCH", body: fields });
+    } else {
+      await apiFetch(`/rooms/${roomId}/habits`, { method: "POST", body: { ...newHabit } });
+    }
     habitFormOpen.value = false;
     newHabit.name = "";
     await loadCore();
   } catch {
-    toast.add({ title: "Could not create room habit", color: "error" });
+    toast.add({ title: "Could not save room habit", color: "error" });
   } finally {
     busy.value = false;
+  }
+}
+
+const deleteHabitFor = ref<RoomHabitWithLink | null>(null);
+
+async function deleteRoomHabit() {
+  if (!deleteHabitFor.value) return;
+  try {
+    await apiFetch(`/rooms/${roomId}/habits/${deleteHabitFor.value.habit.id}`, { method: "DELETE" });
+    deleteHabitFor.value = null;
+    await Promise.all([loadCore(), loadLeaderboard()]);
+  } catch {
+    toast.add({ title: "Could not delete room habit", color: "error" });
   }
 }
 
@@ -144,6 +211,48 @@ async function removeMember(member: RoomMember) {
   } catch {
     toast.add({ title: "Could not remove member", color: "error" });
   }
+}
+
+async function setRole(member: RoomMember, role: "admin" | "member") {
+  try {
+    await apiFetch(`/rooms/${roomId}/members/${member.user_id}`, { method: "PATCH", body: { role } });
+    await loadCore();
+  } catch {
+    toast.add({ title: "Could not change role", color: "error" });
+  }
+}
+
+const transferFor = ref<RoomMember | null>(null);
+
+async function transferOwnership() {
+  if (!transferFor.value) return;
+  try {
+    await apiFetch(`/rooms/${roomId}/transfer-ownership`, {
+      method: "POST",
+      body: { user_id: transferFor.value.user_id },
+    });
+    transferFor.value = null;
+    await loadCore();
+    toast.add({ title: "Ownership transferred", color: "success" });
+  } catch {
+    toast.add({ title: "Could not transfer ownership", color: "error" });
+  }
+}
+
+function memberMenu(member: RoomMember): DropdownMenuItem[][] {
+  const items: DropdownMenuItem[][] = [];
+  if (isOwner.value) {
+    items.push([
+      member.role === "admin"
+        ? { label: "Demote to member", icon: "i-lucide-shield-off", onSelect: () => setRole(member, "member") }
+        : { label: "Promote to admin", icon: "i-lucide-shield", onSelect: () => setRole(member, "admin") },
+      { label: "Transfer ownership", icon: "i-lucide-crown", onSelect: () => (transferFor.value = member) },
+    ]);
+  }
+  items.push([
+    { label: "Remove from room", icon: "i-lucide-user-x", color: "error", onSelect: () => removeMember(member) },
+  ]);
+  return items;
 }
 
 const deleteRoomOpen = ref(false);
@@ -194,7 +303,7 @@ const tabs = [
         </template>
         <template #right>
           <UButton
-            v-if="isOwner"
+            v-if="isAdmin"
             icon="i-lucide-user-plus"
             label="Invite"
             variant="subtle"
@@ -220,12 +329,12 @@ const tabs = [
       <UTabs v-else :items="tabs" class="w-full" variant="link">
         <template #habits>
           <div class="flex flex-col gap-3 pt-4">
-            <div v-if="isOwner" class="flex justify-end">
-              <UButton icon="i-lucide-plus" label="Add room habit" size="sm" @click="habitFormOpen = true" />
+            <div v-if="isAdmin" class="flex justify-end">
+              <UButton icon="i-lucide-plus" label="Add room habit" size="sm" @click="openHabitForm()" />
             </div>
 
             <p v-if="habits.length === 0" class="py-10 text-center text-sm text-muted">
-              No room habits yet.{{ isOwner ? " Add one so members can link their habits." : "" }}
+              No room habits yet.{{ isAdmin ? " Add one so members can link their habits." : "" }}
             </p>
 
             <UCard v-for="item in habits" :key="item.habit.id">
@@ -271,6 +380,24 @@ const tabs = [
                     label="Link my habit"
                     @click="openLinkPicker(item)"
                   />
+                  <template v-if="isAdmin">
+                    <UButton
+                      size="sm"
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-pencil"
+                      aria-label="Edit room habit"
+                      @click="openHabitForm(item)"
+                    />
+                    <UButton
+                      size="sm"
+                      color="error"
+                      variant="ghost"
+                      icon="i-lucide-trash-2"
+                      aria-label="Delete room habit"
+                      @click="deleteHabitFor = item"
+                    />
+                  </template>
                 </div>
               </div>
             </UCard>
@@ -350,23 +477,31 @@ const tabs = [
               <UBadge v-if="member.role === 'owner'" variant="subtle" color="warning" icon="i-lucide-crown">
                 Owner
               </UBadge>
-              <UButton
-                v-else-if="isOwner"
-                size="xs"
-                color="error"
-                variant="ghost"
-                icon="i-lucide-user-x"
-                aria-label="Remove member"
-                @click="removeMember(member)"
-              />
-              <UButton
-                v-else-if="member.user_id === auth.user?.id"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                label="Leave"
-                @click="removeMember(member)"
-              />
+              <template v-else>
+                <UBadge v-if="member.role === 'admin'" variant="subtle" color="info" icon="i-lucide-shield">
+                  Admin
+                </UBadge>
+                <UButton
+                  v-if="member.user_id === auth.user?.id"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  label="Leave"
+                  @click="removeMember(member)"
+                />
+                <UDropdownMenu
+                  v-else-if="isOwner || (isAdmin && member.role === 'member')"
+                  :items="memberMenu(member)"
+                >
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-ellipsis-vertical"
+                    aria-label="Member menu"
+                  />
+                </UDropdownMenu>
+              </template>
             </div>
           </div>
         </template>
@@ -381,16 +516,85 @@ const tabs = [
             <UInput :model-value="inviteLink" readonly class="flex-1" />
             <UButton icon="i-lucide-copy" aria-label="Copy" @click="copyInvite" />
           </div>
+
+          <USeparator label="or" class="my-4" />
+
+          <p class="mb-3 text-sm text-muted">
+            Invite by Telegram username — we'll message them if they use HabitFlow.
+          </p>
+          <form class="flex gap-2" @submit.prevent="sendUsernameInvite">
+            <UInput v-model="inviteUsername" placeholder="@username" class="flex-1" />
+            <UButton
+              type="submit"
+              :loading="inviteBusy"
+              :disabled="!inviteUsername.trim()"
+              label="Send"
+            />
+          </form>
+
+          <UAlert
+            v-if="inviteResult?.status === 'sent'"
+            class="mt-3"
+            color="success"
+            variant="subtle"
+            icon="i-lucide-send"
+            :title="`Invite sent to @${inviteResult.username} via Telegram.`"
+          />
+          <UAlert
+            v-else-if="inviteResult?.status === 'not_linked'"
+            class="mt-3"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-bot-off"
+            :title="`@${inviteResult.username} hasn't connected the Telegram bot.`"
+            description="Share the invite link above with them directly."
+          />
+          <UAlert
+            v-else-if="inviteResult?.status === 'already_member'"
+            class="mt-3"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-user-check"
+            :title="`@${inviteResult.username} is already in this room.`"
+          />
+          <UAlert
+            v-else-if="inviteResult?.status === 'not_registered'"
+            class="mt-3"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-user-plus"
+            :title="`@${inviteResult.username} isn't on HabitFlow yet.`"
+            description="Send them the invite link on Telegram — the room link doubles as an app invite."
+          >
+            <template #actions>
+              <UButton
+                :href="inviteShareUrl"
+                target="_blank"
+                size="xs"
+                icon="i-lucide-send"
+                label="Share on Telegram"
+              />
+              <UButton
+                :href="`https://t.me/${inviteResult.username}`"
+                target="_blank"
+                size="xs"
+                color="neutral"
+                variant="subtle"
+                icon="i-lucide-message-circle"
+                label="Open chat"
+              />
+            </template>
+          </UAlert>
         </template>
       </UModal>
 
-      <UModal v-model:open="habitFormOpen" title="Add room habit">
+      <UModal v-model:open="habitFormOpen" :title="editingHabitId ? 'Edit room habit' : 'Add room habit'">
         <template #body>
-          <form class="flex flex-col gap-4" @submit.prevent="createRoomHabit">
+          <form class="flex flex-col gap-4" @submit.prevent="saveRoomHabit">
             <UFormField label="Name" required>
               <UInput v-model="newHabit.name" class="w-full" autofocus />
             </UFormField>
-            <UFormField label="Type">
+            <UFormField v-if="!editingHabitId" label="Type">
               <URadioGroup
                 v-model="newHabit.type"
                 orientation="horizontal"
@@ -413,7 +617,40 @@ const tabs = [
         <template #footer>
           <div class="flex w-full justify-end gap-2">
             <UButton color="neutral" variant="ghost" label="Cancel" @click="habitFormOpen = false" />
-            <UButton :loading="busy" :disabled="!newHabit.name.trim()" label="Add" @click="createRoomHabit" />
+            <UButton
+              :loading="busy"
+              :disabled="!newHabit.name.trim()"
+              :label="editingHabitId ? 'Save' : 'Add'"
+              @click="saveRoomHabit"
+            />
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        :open="!!transferFor"
+        :title="`Transfer ownership to ${transferFor?.first_name}?`"
+        description="They become the room owner and you stay as an admin. This cannot be undone by you."
+        @update:open="transferFor = null"
+      >
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton label="Cancel" color="neutral" variant="ghost" @click="transferFor = null" />
+            <UButton label="Transfer ownership" color="warning" icon="i-lucide-crown" @click="transferOwnership" />
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        :open="!!deleteHabitFor"
+        :title="`Delete “${deleteHabitFor?.habit.name}”?`"
+        description="Members' personal habits are kept, but unlinked from this room."
+        @update:open="deleteHabitFor = null"
+      >
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton label="Cancel" color="neutral" variant="ghost" @click="deleteHabitFor = null" />
+            <UButton label="Delete habit" color="error" icon="i-lucide-trash-2" @click="deleteRoomHabit" />
           </div>
         </template>
       </UModal>

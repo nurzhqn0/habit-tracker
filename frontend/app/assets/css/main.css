@@ -18,6 +18,16 @@ html:not(.dark) {
   --ui-bg: #fbfbfa;
 }
 
+/* Mobile: no rubber-band body scroll behind the fixed app shell, no double-tap zoom. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+
 /* Gentle entry for landing content. */
 @media (prefers-reduced-motion: no-preference) {
   .fade-up {

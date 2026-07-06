@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.db.tables import UserPreferencesRow, UserRow
@@ -16,6 +16,12 @@ class UserRepo:
     async def get_by_telegram_id(self, telegram_id: int) -> UserRow | None:
         result = await self.session.execute(select(UserRow).where(UserRow.telegram_id == telegram_id))
         return result.scalar_one_or_none()
+
+    async def find_by_username(self, username: str) -> UserRow | None:
+        result = await self.session.execute(
+            select(UserRow).where(func.lower(UserRow.username) == username.lower())
+        )
+        return result.scalars().first()
 
     async def upsert_from_telegram(
         self, telegram_id: int, first_name: str, username: str | None, photo_url: str | None

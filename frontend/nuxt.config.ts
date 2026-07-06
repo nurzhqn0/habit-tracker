@@ -9,6 +9,10 @@ export default defineNuxtConfig({
       titleTemplate: (title?: string) => (title ? `${title} · HabitFlow` : "HabitFlow — Make consistency visible"),
       meta: [
         {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover",
+        },
+        {
           name: "description",
           content:
             "Track yes/no and measurable habits, watch your habit strength grow, and stay accountable with friends — with reminders delivered by Telegram.",

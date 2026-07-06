@@ -148,10 +148,18 @@ async def test_xlsx_analytics_sheets(client):
     assert rows["Read"][7] == 25.0
 
     weekly = workbook["Weekly"]
-    assert [c.value for c in weekly[1]] == ["Habit", "Week", "Completions", "Total value", "Avg score"]
+    assert [c.value for c in weekly[1]] == [
+        "Habit", "Week", "Completions", "Success rate", "Total value", "Daily average", "Avg score",
+    ]
     weekly_rows = list(weekly.iter_rows(min_row=2, values_only=True))
     assert sum(r[2] for r in weekly_rows if r[0] == "Meditate") == 3
-    assert sum(r[3] for r in weekly_rows if r[0] == "Read") == 25.0
+    assert sum(r[4] for r in weekly_rows if r[0] == "Read") == 25.0
+    # Entries cover every expected day, so success rates are in (0, 1].
+    # Exact values depend on where TODAY falls in the ISO week, so assert bounds only.
+    for r in weekly_rows:
+        assert 0 < r[3] <= 1.0
+    read_row = next(r for r in weekly_rows if r[0] == "Read")
+    assert read_row[5] == 25.0  # daily average
 
     monthly = workbook["Monthly"]
     monthly_rows = list(monthly.iter_rows(min_row=2, values_only=True))

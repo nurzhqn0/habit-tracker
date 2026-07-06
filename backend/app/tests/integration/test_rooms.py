@@ -210,3 +210,147 @@ async def test_member_removal_and_leave(client):
         await client.delete(f"/rooms/{room['id']}/members/{member_id}", headers=member)
     ).status_code == 204
     assert (await client.get(f"/rooms/{room['id']}", headers=member)).status_code == 404
+
+
+async def test_admin_permissions(client):
+    owner = bearer(await login(client, 5020))
+    admin_tokens = await login(client, 5021)
+    admin = bearer(admin_tokens)
+    admin_id = admin_tokens["user"]["id"]
+    member_tokens = await login(client, 5022)
+    member = bearer(member_tokens)
+    member_id = member_tokens["user"]["id"]
+    room = await make_room(client, owner)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=admin)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+
+    # Member cannot promote anyone; owner promotes admin.
+    assert (
+        await client.patch(
+            f"/rooms/{room['id']}/members/{member_id}", json={"role": "admin"}, headers=admin
+        )
+    ).status_code == 403
+    assert (
+        await client.patch(
+            f"/rooms/{room['id']}/members/{admin_id}", json={"role": "admin"}, headers=owner
+        )
+    ).status_code == 204
+    members = (await client.get(f"/rooms/{room['id']}/members", headers=owner)).json()
+    assert next(m["role"] for m in members if m["user_id"] == admin_id) == "admin"
+
+    # Admin can manage room habits and rotate the invite code.
+    created = await client.post(f"/rooms/{room['id']}/habits", json={"name": "Run"}, headers=admin)
+    assert created.status_code == 201
+    assert (
+        await client.patch(
+            f"/rooms/{room['id']}/habits/{created.json()['id']}", json={"name": "Jog"}, headers=admin
+        )
+    ).status_code == 200
+    assert (
+        await client.delete(f"/rooms/{room['id']}/habits/{created.json()['id']}", headers=admin)
+    ).status_code == 204
+    assert (await client.post(f"/rooms/{room['id']}/invite/rotate", headers=admin)).status_code == 200
+
+    # Admin cannot patch/delete the room or change roles.
+    assert (
+        await client.patch(f"/rooms/{room['id']}", json={"name": "Mine"}, headers=admin)
+    ).status_code == 403
+    assert (await client.delete(f"/rooms/{room['id']}", headers=admin)).status_code == 403
+    assert (
+        await client.patch(
+            f"/rooms/{room['id']}/members/{member_id}", json={"role": "admin"}, headers=admin
+        )
+    ).status_code == 403
+
+    # Second admin: admin cannot remove another admin, but can remove a plain member.
+    second_admin_tokens = await login(client, 5023)
+    second_admin = bearer(second_admin_tokens)
+    second_admin_id = second_admin_tokens["user"]["id"]
+    await client.post("/rooms/join", json={"code": (await client.get(f"/rooms/{room['id']}", headers=owner)).json()["invite_code"]}, headers=second_admin)
+    await client.patch(
+        f"/rooms/{room['id']}/members/{second_admin_id}", json={"role": "admin"}, headers=owner
+    )
+    assert (
+        await client.delete(f"/rooms/{room['id']}/members/{second_admin_id}", headers=admin)
+    ).status_code == 403
+    assert (
+        await client.delete(f"/rooms/{room['id']}/members/{member_id}", headers=admin)
+    ).status_code == 204
+
+    # Owner demotes the admin back to member.
+    assert (
+        await client.patch(
+            f"/rooms/{room['id']}/members/{admin_id}", json={"role": "member"}, headers=owner
+        )
+    ).status_code == 204
+    assert (await client.post(f"/rooms/{room['id']}/invite/rotate", headers=admin)).status_code == 403
+
+
+async def test_transfer_ownership(client):
+    owner_tokens = await login(client, 5024)
+    owner = bearer(owner_tokens)
+    owner_id = owner_tokens["user"]["id"]
+    member_tokens = await login(client, 5025)
+    member = bearer(member_tokens)
+    member_id = member_tokens["user"]["id"]
+    room = await make_room(client, owner)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+
+    # Non-owner cannot transfer; owner cannot change their own role.
+    assert (
+        await client.post(
+            f"/rooms/{room['id']}/transfer-ownership", json={"user_id": member_id}, headers=member
+        )
+    ).status_code == 403
+    assert (
+        await client.patch(
+            f"/rooms/{room['id']}/members/{owner_id}", json={"role": "member"}, headers=owner
+        )
+    ).status_code == 422
+
+    transferred = await client.post(
+        f"/rooms/{room['id']}/transfer-ownership", json={"user_id": member_id}, headers=owner
+    )
+    assert transferred.status_code == 200
+    assert transferred.json()["owner_id"] == member_id
+
+    members = (await client.get(f"/rooms/{room['id']}/members", headers=owner)).json()
+    roles = {m["user_id"]: m["role"] for m in members}
+    assert roles[member_id] == "owner"
+    assert roles[owner_id] == "admin"
+
+    # Old owner keeps admin powers but cannot delete the room anymore.
+    assert (await client.post(f"/rooms/{room['id']}/invite/rotate", headers=owner)).status_code == 200
+    assert (await client.delete(f"/rooms/{room['id']}", headers=owner)).status_code == 403
+
+
+async def test_invite_by_username(client):
+    owner = bearer(await login(client, 5030))
+    member_tokens = await login(client, 5031)  # username alice5031
+    member = bearer(member_tokens)
+    outsider_tokens = await login(client, 5032)  # username alice5032, never joins
+    assert outsider_tokens
+    room = await make_room(client, owner)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+
+    url = f"/rooms/{room['id']}/invite"
+
+    # Plain member cannot invite.
+    assert (
+        await client.post(url, json={"username": "alice5032"}, headers=member)
+    ).status_code == 403
+
+    # Unknown username.
+    result = (await client.post(url, json={"username": "ghost"}, headers=owner)).json()
+    assert result["status"] == "not_registered"
+    assert result["username"] == "ghost"
+    assert room["invite_code"] in result["link"]
+
+    # Registered but bot not linked (and no bot in tests).
+    result = (await client.post(url, json={"username": "alice5032"}, headers=owner)).json()
+    assert result["status"] == "not_linked"
+
+    # Existing member; "@" prefix and case are normalized.
+    result = (await client.post(url, json={"username": "@ALICE5031"}, headers=owner)).json()
+    assert result["status"] == "already_member"
+    assert result["username"] == "ALICE5031"

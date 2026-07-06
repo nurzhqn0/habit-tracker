@@ -12,7 +12,7 @@ export interface RoomMember {
   first_name: string;
   username: string | null;
   photo_url: string | null;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
   joined_at: string;
 }
 

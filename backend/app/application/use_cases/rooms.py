@@ -33,6 +33,16 @@ async def _require_owner(session: AsyncSession, room_id: int, user_id: int) -> R
     return room
 
 
+async def _require_admin(session: AsyncSession, room_id: int, user_id: int) -> RoomRow:
+    room = await _require_member(session, room_id, user_id)
+    if room.owner_id == user_id:
+        return room
+    membership = await RoomRepo(session).membership(room_id, user_id)
+    if membership.role not in ("owner", "admin"):
+        raise ForbiddenError("Only room admins can do this")
+    return room
+
+
 async def create_room(session: AsyncSession, user_id: int, name: str, description: str) -> RoomRow:
     if not name.strip():
         raise ValidationError("Room name must not be empty")
@@ -60,10 +70,42 @@ async def delete_room(session: AsyncSession, user_id: int, room_id: int) -> None
 
 
 async def rotate_invite(session: AsyncSession, user_id: int, room_id: int) -> str:
-    room = await _require_owner(session, room_id, user_id)
+    room = await _require_admin(session, room_id, user_id)
     room.invite_code = generate_invite_code()
     await session.commit()
     return room.invite_code
+
+
+async def invite_by_username(
+    session: AsyncSession, bot, user_id: int, room_id: int, username: str, join_link: str
+) -> tuple[str, str]:
+    """Invites a user by Telegram username; returns (status, normalized username)."""
+    room = await _require_admin(session, room_id, user_id)
+    uname = username.strip().lstrip("@")
+    target = await UserRepo(session).find_by_username(uname)
+    if target is None:
+        return "not_registered", uname
+    if await RoomRepo(session).membership(room_id, target.id) is not None:
+        return "already_member", uname
+    if bot is None or not target.bot_linked:
+        return "not_linked", uname
+
+    from aiogram.exceptions import TelegramAPIError
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    inviter = await UserRepo(session).get_by_id(user_id)
+    try:
+        await bot.send_message(
+            target.telegram_id,
+            f"👋 {inviter.first_name} invited you to join *{room.name}* on HabitFlow",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="Join room", url=join_link)]]
+            ),
+        )
+    except TelegramAPIError:
+        return "not_linked", uname
+    return "sent", uname
 
 
 async def join_room(session: AsyncSession, user_id: int, code: str) -> RoomRow:
@@ -85,7 +127,10 @@ async def remove_member(session: AsyncSession, user_id: int, room_id: int, targe
     repo = RoomRepo(session)
     room = await _require_member(session, room_id, user_id)
     if target_user_id != user_id and room.owner_id != user_id:
-        raise ForbiddenError("Only the room owner can remove members")
+        actor = await repo.membership(room_id, user_id)
+        target = await repo.membership(room_id, target_user_id)
+        if actor.role != "admin" or (target is not None and target.role != "member"):
+            raise ForbiddenError("Only the room owner or an admin can remove members")
     if target_user_id == room.owner_id:
         raise ValidationError("The owner cannot leave their own room; delete it instead")
 
@@ -104,8 +149,39 @@ async def remove_member(session: AsyncSession, user_id: int, room_id: int, targe
     await session.commit()
 
 
+async def set_member_role(
+    session: AsyncSession, user_id: int, room_id: int, target_user_id: int, role: str
+) -> None:
+    room = await _require_owner(session, room_id, user_id)
+    if target_user_id == room.owner_id:
+        raise ValidationError("The owner's role cannot be changed; transfer ownership instead")
+    membership = await RoomRepo(session).membership(room_id, target_user_id)
+    if membership is None:
+        raise NotFoundError("Member not found")
+    membership.role = role
+    await session.commit()
+
+
+async def transfer_ownership(
+    session: AsyncSession, user_id: int, room_id: int, target_user_id: int
+) -> RoomRow:
+    room = await _require_owner(session, room_id, user_id)
+    if target_user_id == user_id:
+        raise ValidationError("You already own this room")
+    repo = RoomRepo(session)
+    target = await repo.membership(room_id, target_user_id)
+    if target is None:
+        raise NotFoundError("Member not found")
+    old_owner = await repo.membership(room_id, user_id)
+    room.owner_id = target_user_id
+    target.role = "owner"
+    old_owner.role = "admin"
+    await session.commit()
+    return room
+
+
 async def create_room_habit(session: AsyncSession, user_id: int, room_id: int, fields: dict) -> RoomHabitRow:
-    await _require_owner(session, room_id, user_id)
+    await _require_admin(session, room_id, user_id)
     if not str(fields.get("name", "")).strip():
         raise ValidationError("Habit name must not be empty")
     habit = RoomHabitRow(
@@ -122,7 +198,7 @@ async def create_room_habit(session: AsyncSession, user_id: int, room_id: int, f
 async def update_room_habit(
     session: AsyncSession, user_id: int, room_id: int, room_habit_id: int, fields: dict
 ) -> RoomHabitRow:
-    await _require_owner(session, room_id, user_id)
+    await _require_admin(session, room_id, user_id)
     habit = await RoomRepo(session).get_room_habit(room_id, room_habit_id)
     for key, value in fields.items():
         if key in ROOM_HABIT_FIELDS or key == "archived":
@@ -132,7 +208,7 @@ async def update_room_habit(
 
 
 async def delete_room_habit(session: AsyncSession, user_id: int, room_id: int, room_habit_id: int) -> None:
-    await _require_owner(session, room_id, user_id)
+    await _require_admin(session, room_id, user_id)
     habit = await RoomRepo(session).get_room_habit(room_id, room_habit_id)
     await session.delete(habit)
     await session.commit()
