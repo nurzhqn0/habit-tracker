@@ -101,6 +101,53 @@ async def test_import_is_idempotent_by_name(client):
     assert len(habits) == 2
 
 
+def _loop_zip() -> bytes:
+    d0, d1, d2, d3 = (TODAY - timedelta(days=n) for n in range(4))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        zf.writestr(
+            "Habits.csv",
+            "Position,Name,Question,Description,NumRepetitions,Interval,Color\n"
+            "001,sadaqa,,,1,1,#F57C00\n"
+            "002,cvn,,,1,7,#303030\n",
+        )
+        # Real Loop per-habit files have no header row and are newest-first.
+        zf.writestr("001 sadaqa/Checkmarks.csv", f"{d0},2\n{d1},1\n{d2},0\n{d3},2\n")
+        zf.writestr("001 sadaqa/Scores.csv", f"{d0},1.0000\n")
+        # Root aggregate files must be ignored.
+        zf.writestr("Checkmarks.csv", f"Date,sadaqa,\n{d0},2,\n")
+        zf.writestr("Scores.csv", f"Date,sadaqa,\n{d0},1.0000,\n")
+    return buffer.getvalue()
+
+
+async def test_import_loop_android_format(client):
+    headers = bearer(await login(client, 4007))
+    response = await client.post(
+        "/import/csv",
+        files={"file": ("loop.zip", _loop_zip(), "application/zip")},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["habits_created"] == 2
+    assert body["entries_imported"] == 2  # only the two value-2 rows; 1 and 0 skipped
+
+    habits = (await client.get("/habits", headers=headers)).json()
+    by_name = {h["name"]: h for h in habits}
+    assert set(by_name) == {"sadaqa", "cvn"}
+    assert by_name["sadaqa"]["color"] == 2  # #F57C00
+    assert by_name["cvn"]["freq_num"] == 1
+    assert by_name["cvn"]["freq_den"] == 7
+    assert by_name["cvn"]["color"] == 8  # non-palette hex falls back to default
+
+    entries = await client.get(
+        f"/habits/{by_name['sadaqa']['id']}/entries",
+        params={"from": str(TODAY), "to": str(TODAY)},
+        headers=headers,
+    )
+    assert entries.json()[0]["value"] == 2  # newest row imported despite no header
+
+
 async def test_import_rejects_garbage(client):
     headers = bearer(await login(client, 4004))
     response = await client.post(

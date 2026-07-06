@@ -31,3 +31,4 @@ nginx/certs/*
 !nginx/certs/.gitkeep
 # DB backups
 backups/
+files/

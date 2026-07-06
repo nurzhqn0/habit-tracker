@@ -2,7 +2,8 @@
 
 Export ZIP layout mirrors uhabits HabitsCSVExporter: Habits.csv at the root,
 plus "NNN <name>/Checkmarks.csv" and "NNN <name>/Scores.csv" per habit.
-Import consumes the same layout (matches by habit name; entries upserted).
+Import consumes the same layout (matches by habit name; entries upserted), plus
+real Loop Android exports: 7-column Habits.csv, headerless per-habit Checkmarks.csv.
 """
 
 import csv
@@ -314,6 +315,9 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
     if len(rows) - 1 > MAX_HABITS:
         raise ValidationError("Too many habits in archive")
 
+    # Real Loop Android exports use a 7-column Habits.csv (no Type/Target columns).
+    loop_format = "NumRepetitions" in [c.strip() for c in rows[0]]
+
     habit_repo = HabitRepo(session)
     entry_repo = EntryRepo(session)
     existing = {h.name: h for h in await habit_repo.list_for_user(user_id)}
@@ -323,16 +327,26 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
     updated_entries = 0
 
     for row in rows[1:]:
-        if len(row) < 12 or not row[1].strip():
+        if len(row) < (7 if loop_format else 12) or not row[1].strip():
             continue
-        position, name, type_name = row[0], row[1].strip(), row[2].strip()
-        habit_type = 1 if type_name == "NUMERICAL" else 0
-
-        habit = existing.get(name)
-        if habit is None:
-            habit = await habit_repo.create(
-                user_id,
-                name=name,
+        position, name = row[0], row[1].strip()
+        if loop_format:
+            habit_type = 0
+            fields = dict(
+                question=row[2],
+                description=row[3],
+                type=0,
+                freq_num=max(1, int(float(row[4] or 1))),
+                freq_den=max(1, int(float(row[5] or 1))),
+                color=hex_to_color.get(row[6].strip().lower(), 8),
+                unit="",
+                target_type=0,
+                target_value=0.0,
+                archived=False,
+            )
+        else:
+            habit_type = 1 if row[2].strip() == "NUMERICAL" else 0
+            fields = dict(
                 question=row[3],
                 description=row[4],
                 type=habit_type,
@@ -344,6 +358,10 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
                 target_value=float(row[10] or 0),
                 archived=row[11].strip() in ("1", "yes", "true"),
             )
+
+        habit = existing.get(name)
+        if habit is None:
+            habit = await habit_repo.create(user_id, name=name, **fields)
             existing[name] = habit
             created += 1
 
@@ -356,7 +374,10 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
             continue
 
         entry_reader = csv.reader(io.StringIO(zf.read(checkmarks_name).decode("utf-8-sig")))
-        entry_rows = list(entry_reader)[1:]
+        entry_rows = list(entry_reader)
+        # Loop's per-habit Checkmarks.csv has no header row; ours does.
+        if entry_rows and entry_rows[0] and entry_rows[0][0].strip().lower() == "date":
+            entry_rows = entry_rows[1:]
         if len(entry_rows) > MAX_ENTRIES_PER_HABIT:
             raise ValidationError(f"Too many entries for habit {name}")
 
@@ -371,6 +392,11 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
             notes = entry_row[2] if len(entry_row) > 2 else ""
             # YES_AUTO and UNKNOWN are derived — never persist them.
             if value is None or value in (YES_AUTO, UNKNOWN):
+                continue
+            # Loop's dense export writes 0 for empty days (indistinguishable from
+            # explicit NO) and raw numeric values for numerical habits; only
+            # explicit yes/skip are real boolean entries.
+            if loop_format and value not in (YES_MANUAL, SKIP):
                 continue
             await entry_repo.upsert(habit.id, entry_date, value, notes or None)
             updated_entries += 1
