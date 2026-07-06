@@ -53,6 +53,8 @@ services:
     build: ./frontend
     environment:
       NUXT_PUBLIC_API_BASE: /api/v1
+      # SSR-side API base (docker network) — keeps auth working on hard refresh.
+      NUXT_API_INTERNAL_BASE: http://api:8000/api/v1
       NUXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-}
       NUXT_PUBLIC_TG_CLIENT_ID: ${TG_CLIENT_ID:-}
     restart: unless-stopped

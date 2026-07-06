@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,11 @@ class Settings(BaseSettings):
 
     frontend_origin: str = "http://localhost:3000"
     test_mode: bool = False
+
+    @field_validator("frontend_origin")
+    @classmethod
+    def _strip_trailing_slash(cls, v: str) -> str:
+        return v.rstrip("/")
 
 
 @lru_cache

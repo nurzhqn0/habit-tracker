@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.application.use_cases import entries as entries_uc
 from app.domain.errors import DomainError
 from app.domain.models.entry import SKIP, YES_MANUAL
+from app.domain.models.habit import HabitType
 from app.infrastructure.db.tables import UserRow
+from app.infrastructure.repositories.habit_repo import HabitRepo
 
 router = Router()
 
@@ -27,6 +29,13 @@ SNOOZE_MINUTES = 60
 async def _user_by_telegram(session, telegram_id: int) -> UserRow | None:
     result = await session.execute(select(UserRow).where(UserRow.telegram_id == telegram_id))
     return result.scalar_one_or_none()
+
+
+def done_value(habit) -> int:
+    """Entry value for a bot "Done" tap. Numerical entries are stored as value*1000."""
+    if habit.type == HabitType.NUMERICAL:
+        return int(habit.target_value * 1000)
+    return YES_MANUAL
 
 
 @router.message(CommandStart())
@@ -71,9 +80,9 @@ async def on_entry_action(callback: CallbackQuery) -> None:
                 await callback.message.edit_reply_markup(reply_markup=None)
             return
 
-        value = YES_MANUAL if action == "done" else SKIP
         try:
-            # Ownership is enforced inside the use case (get_owned by user id).
+            habit = await HabitRepo(session).get_owned(habit_id, user.id)
+            value = done_value(habit) if action == "done" else SKIP
             await entries_uc.upsert_entry(session, user.id, habit_id, entry_date, value, None)
         except DomainError:
             await callback.answer("Habit not found")

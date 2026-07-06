@@ -8,6 +8,7 @@ import { lastNDateKeys, todayKey, weekdayShort, dayOfMonth } from "~/composables
 import { paletteColor } from "~/composables/usePalette";
 
 definePageMeta({ layout: "dashboard" });
+useHead({ title: "Habits" });
 
 const store = useHabitsStore();
 const toast = useToast();
@@ -19,6 +20,19 @@ const today = todayKey();
 
 const formOpen = ref(false);
 const editing = ref<Habit | undefined>();
+const deleting = ref<Habit | null>(null);
+
+async function confirmDelete() {
+  const habit = deleting.value;
+  if (!habit) return;
+  deleting.value = null;
+  try {
+    await store.deleteHabit(habit.id);
+    toast.add({ title: `Deleted "${habit.name}"`, color: "neutral" });
+  } catch {
+    toast.add({ title: "Could not delete habit", color: "error" });
+  }
+}
 
 async function load() {
   const range = days.value;
@@ -95,9 +109,8 @@ function rowMenu(item: HabitOverviewItem): DropdownMenuItem[][] {
         label: "Delete",
         icon: "i-lucide-trash-2",
         color: "error",
-        onSelect: async () => {
-          await store.deleteHabit(habit.id);
-          toast.add({ title: `Deleted "${habit.name}"`, color: "neutral" });
+        onSelect: () => {
+          deleting.value = habit;
         },
       },
     ],
@@ -122,7 +135,9 @@ async function onDragEnd() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <USwitch v-model="store.showArchived" label="Archived" size="sm" @change="load" />
+          <UTooltip text="Include archived habits (shown dimmed)">
+            <USwitch v-model="store.showArchived" label="Show archived" size="sm" @change="load" />
+          </UTooltip>
           <UDropdownMenu :items="sortItems">
             <UButton icon="i-lucide-arrow-up-down" color="neutral" variant="ghost" aria-label="Sort" />
           </UDropdownMenu>
@@ -237,6 +252,20 @@ async function onDragEnd() {
       </div>
 
       <HabitFormModal v-model:open="formOpen" :habit="editing" />
+
+      <UModal
+        :open="deleting !== null"
+        :title="`Delete “${deleting?.name}”?`"
+        description="All its entries will be removed. This cannot be undone."
+        @update:open="(open: boolean) => { if (!open) deleting = null; }"
+      >
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton label="Cancel" color="neutral" variant="ghost" @click="deleting = null" />
+            <UButton label="Delete" color="error" icon="i-lucide-trash-2" @click="confirmDelete" />
+          </div>
+        </template>
+      </UModal>
     </template>
   </UDashboardPanel>
 </template>

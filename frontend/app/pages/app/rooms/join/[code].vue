@@ -3,6 +3,7 @@ import type { Room } from "~~/shared/types/rooms";
 import { apiFetch } from "~/services/api/client";
 
 definePageMeta({ layout: "dashboard" });
+useHead({ title: "Join room" });
 
 const route = useRoute();
 const router = useRouter();

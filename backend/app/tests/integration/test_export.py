@@ -121,3 +121,38 @@ async def test_xlsx_export(client):
     habits_sheet = workbook["Habits"]
     names = [row[1] for row in habits_sheet.iter_rows(min_row=2, values_only=True)]
     assert names == ["Meditate", "Read"]
+
+
+async def test_xlsx_analytics_sheets(client):
+    headers = bearer(await login(client, 4006))
+    await seed(client, headers)
+
+    response = await client.get("/export/xlsx", headers=headers)
+    workbook = load_workbook(io.BytesIO(response.content))
+    for name in ("Summary", "Weekly", "Monthly"):
+        assert name in workbook.sheetnames
+
+    summary = workbook["Summary"]
+    header = [c.value for c in summary[1]]
+    assert header == [
+        "Habit", "Type", "Success rate", "Current streak", "Best streak",
+        "Total completions", "Total value", "Daily average", "First entry", "Last entry",
+    ]
+    rows = {row[0]: row for row in summary.iter_rows(min_row=2, values_only=True)}
+    # 3 daily toggles → current streak 3, 3 completions.
+    assert rows["Meditate"][3] == 3
+    assert rows["Meditate"][5] == 3
+    # 25000 millis = 25.0 total, one entry day → daily average 25.0, meets target 20.
+    assert rows["Read"][5] == 1
+    assert rows["Read"][6] == 25.0
+    assert rows["Read"][7] == 25.0
+
+    weekly = workbook["Weekly"]
+    assert [c.value for c in weekly[1]] == ["Habit", "Week", "Completions", "Total value", "Avg score"]
+    weekly_rows = list(weekly.iter_rows(min_row=2, values_only=True))
+    assert sum(r[2] for r in weekly_rows if r[0] == "Meditate") == 3
+    assert sum(r[3] for r in weekly_rows if r[0] == "Read") == 25.0
+
+    monthly = workbook["Monthly"]
+    monthly_rows = list(monthly.iter_rows(min_row=2, values_only=True))
+    assert sum(r[2] for r in monthly_rows if r[0] == "Meditate") == 3

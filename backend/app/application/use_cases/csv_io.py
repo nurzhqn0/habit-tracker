@@ -12,6 +12,7 @@ import zipfile
 from datetime import date as Date
 
 from openpyxl import Workbook
+from openpyxl.styles import Font
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import habit_math
@@ -112,6 +113,88 @@ async def export_zip(session: AsyncSession, user_id: int, habit_id: int | None =
     return buffer.getvalue()
 
 
+def _is_completed(row, value: int) -> bool:
+    if row.type == 0:
+        return value in (YES_AUTO, YES_MANUAL)
+    if value < 0:
+        return False
+    actual = value / 1000
+    return actual <= row.target_value if row.target_type == 1 else actual >= row.target_value
+
+
+def _week_key(date: Date) -> str:
+    iso = date.isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
+
+
+def _month_key(date: Date) -> str:
+    return f"{date.year}-{date.month:02d}"
+
+
+def _append_summary(workbook: Workbook, prepared: list, today: Date) -> None:
+    ws = workbook.create_sheet("Summary")
+    ws.append([
+        "Habit", "Type", "Success rate", "Current streak", "Best streak",
+        "Total completions", "Total value", "Daily average", "First entry", "Last entry",
+    ])
+    for row, habit, computed, scores in prepared:
+        known = get_known(computed)  # newest first
+        completions = sum(1 for e in known if _is_completed(row, e.value))
+        entry_days = sum(1 for e in known if e.value >= 0)
+        total_value = sum(e.value for e in known if e.value >= 0) / 1000 if row.type == 1 else None
+        streaks = habit_math.streaks_for(habit, computed, today)
+        ws.append([
+            row.name,
+            "YES_NO" if row.type == 0 else "NUMERICAL",
+            habit_math.score_on(habit, computed, today),
+            habit_math.current_streak(habit, computed, today),
+            max((s.length for s in streaks), default=0),
+            completions,
+            round(total_value, 2) if total_value is not None else "",
+            round(total_value / entry_days, 2) if total_value is not None and entry_days else "",
+            known[-1].date.isoformat() if known else "",
+            known[0].date.isoformat() if known else "",
+        ])
+        ws.cell(row=ws.max_row, column=3).number_format = "0.0%"
+
+
+def _append_period_sheets(workbook: Workbook, prepared: list) -> None:
+    for sheet_name, period_header, key_fn in (
+        ("Weekly", "Week", _week_key),
+        ("Monthly", "Month", _month_key),
+    ):
+        ws = workbook.create_sheet(sheet_name)
+        ws.append(["Habit", period_header, "Completions", "Total value", "Avg score"])
+        for row, habit, computed, scores in prepared:
+            buckets: dict[str, dict] = {}
+            for entry in get_known(computed):
+                bucket = buckets.setdefault(key_fn(entry.date), {"completions": 0, "total": 0.0})
+                if _is_completed(row, entry.value):
+                    bucket["completions"] += 1
+                if row.type == 1 and entry.value >= 0:
+                    bucket["total"] += entry.value / 1000
+            score_buckets: dict[str, list[float]] = {}
+            for date, value in scores.items():
+                score_buckets.setdefault(key_fn(date), []).append(value)
+            for key in sorted(buckets):
+                values = score_buckets.get(key, [])
+                ws.append([
+                    row.name,
+                    key,
+                    buckets[key]["completions"],
+                    round(buckets[key]["total"], 2) if row.type == 1 else "",
+                    sum(values) / len(values) if values else 0.0,
+                ])
+                ws.cell(row=ws.max_row, column=5).number_format = "0.0%"
+
+
+def _style_headers(workbook: Workbook) -> None:
+    for ws in workbook.worksheets:
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+        ws.freeze_panes = "A2"
+
+
 async def export_xlsx(session: AsyncSession, user_id: int, habit_id: int | None = None) -> bytes:
     rows, entries_by_habit, today = await _load(session, user_id, habit_id)
 
@@ -130,12 +213,18 @@ async def export_xlsx(session: AsyncSession, user_id: int, habit_id: int | None 
             "yes" if row.archived else "no",
         ])
 
-    used_titles = {"Habits"}
-    for index, row in enumerate(rows):
+    prepared = []
+    for row in rows:
         habit = habit_math.to_domain(row)
         computed = habit_math.computed_entries_for(habit, entries_by_habit[row.id])
         scores = {s.date: s.value for s in habit_math.scores_for(habit, computed, today)}
+        prepared.append((row, habit, computed, scores))
 
+    _append_summary(workbook, prepared, today)
+    _append_period_sheets(workbook, prepared)
+
+    used_titles = {"Habits", "Summary", "Weekly", "Monthly"}
+    for index, (row, habit, computed, scores) in enumerate(prepared):
         title = _sanitize(row.name)[:24] or f"Habit {index + 1}"
         base = title
         suffix = 2
@@ -154,6 +243,8 @@ async def export_xlsx(session: AsyncSession, user_id: int, habit_id: int | None 
                 entry.notes,
                 round(scores.get(entry.date, 0.0), 4),
             ])
+
+    _style_headers(workbook)
 
     buffer = io.BytesIO()
     workbook.save(buffer)

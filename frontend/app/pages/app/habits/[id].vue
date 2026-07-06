@@ -28,6 +28,8 @@ const editOpen = ref(false);
 
 const color = computed(() => paletteColor(habit.value?.color ?? 8));
 
+useHead({ title: computed(() => habit.value?.name ?? "Habit") });
+
 const frequencyLabel = computed(() => {
   if (!habit.value) return "";
   const { freq_num: num, freq_den: den } = habit.value;
@@ -88,7 +90,10 @@ async function onPickDay(date: string) {
   }
 }
 
+const deleteOpen = ref(false);
+
 async function onDelete() {
+  deleteOpen.value = false;
   await store.deleteHabit(habitId);
   toast.add({ title: `Deleted "${habit.value?.name}"` });
   router.replace("/app");
@@ -106,7 +111,7 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
         </template>
         <template #right>
           <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" label="Edit" @click="editOpen = true" />
-          <UButton icon="i-lucide-trash-2" color="error" variant="ghost" aria-label="Delete" @click="onDelete" />
+          <UButton icon="i-lucide-trash-2" color="error" variant="ghost" aria-label="Delete" @click="deleteOpen = true" />
         </template>
       </UDashboardNavbar>
     </template>
@@ -196,6 +201,19 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
       </div>
 
       <HabitFormModal v-model:open="editOpen" :habit="habit ?? undefined" @saved="loadAll" />
+
+      <UModal
+        v-model:open="deleteOpen"
+        :title="`Delete “${habit?.name}”?`"
+        description="All its entries will be removed. This cannot be undone."
+      >
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton label="Cancel" color="neutral" variant="ghost" @click="deleteOpen = false" />
+            <UButton label="Delete" color="error" icon="i-lucide-trash-2" @click="onDelete" />
+          </div>
+        </template>
+      </UModal>
     </template>
   </UDashboardPanel>
 </template>

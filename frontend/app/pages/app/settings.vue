@@ -3,6 +3,7 @@ import type { Preferences } from "~~/shared/types/api";
 import { apiFetch, useAuthTokens } from "~/services/api/client";
 
 definePageMeta({ layout: "dashboard" });
+useHead({ title: "Settings" });
 
 const toast = useToast();
 const auth = useAuthStore();
@@ -211,6 +212,22 @@ const botLink = computed(() => (botUsername ? `https://t.me/${botUsername}?start
                 Accepts HabitFlow / Loop CSV ZIP archives. Existing habits are matched by name.
               </p>
             </div>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <p class="font-semibold text-highlighted">Account</p>
+          </template>
+          <div class="flex items-center justify-between gap-4">
+            <p class="text-sm text-muted">Sign out of HabitFlow on this device.</p>
+            <UButton
+              icon="i-lucide-log-out"
+              label="Log out"
+              color="neutral"
+              variant="subtle"
+              @click="auth.logout()"
+            />
           </div>
         </UCard>
       </div>

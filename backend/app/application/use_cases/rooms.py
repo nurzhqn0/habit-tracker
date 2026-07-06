@@ -151,6 +151,8 @@ async def link_habit(
 
     if habit_id is not None:
         habit = await HabitRepo(session).get_owned(habit_id, user_id)
+        if habit.type != room_habit.type:
+            raise ValidationError("Habit type does not match the room habit")
         existing_link = await repo.link_for_habit(habit.id)
         if existing_link is not None:
             raise ConflictError("This habit is already linked to a room habit")

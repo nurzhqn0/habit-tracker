@@ -103,6 +103,30 @@ async def test_link_and_create_from_template(client):
     ).status_code == 204
 
 
+async def test_link_rejects_type_mismatch(client):
+    owner = bearer(await login(client, 5014))
+    room = await make_room(client, owner)
+
+    # Yes/no room habit, numerical personal habit.
+    room_habit = (
+        await client.post(f"/rooms/{room['id']}/habits", json={"name": "Read"}, headers=owner)
+    ).json()
+    numerical = (
+        await client.post(
+            "/habits",
+            json={"name": "Pages", "type": 1, "target_value": 10, "unit": "pages"},
+            headers=owner,
+        )
+    ).json()
+
+    response = await client.post(
+        f"/rooms/{room['id']}/habits/{room_habit['id']}/link",
+        json={"habit_id": numerical["id"]},
+        headers=owner,
+    )
+    assert response.status_code == 422
+
+
 async def test_leaderboard_and_feed(client):
     owner = bearer(await login(client, 5006))
     member = bearer(await login(client, 5007))

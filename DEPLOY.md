@@ -101,9 +101,13 @@ ENVIRONMENT=production
 JWT_SECRET=<paste output of: openssl rand -hex 32>
 BOT_TOKEN=123456789:AA...            # from BotFather
 BOT_USERNAME=habitflow_prod_bot      # without @
-FRONTEND_ORIGIN=https://habitflow.example.com
+FRONTEND_ORIGIN=https://habitflow.example.com   # https, NO trailing slash (used for CORS + invite links)
 TEST_MODE=false
 ```
+
+> The frontend container also gets `NUXT_API_INTERNAL_BASE=http://api:8000/api/v1`
+> (set in docker-compose.yml) so SSR can reach the API over the docker network —
+> without it a hard refresh on `/app` logs the user out.
 
 > The API refuses to start in production with a missing/short `JWT_SECRET` or with
 > `TEST_MODE=1` — if the api container crash-loops, check `docker compose logs api`.

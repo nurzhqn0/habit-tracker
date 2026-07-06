@@ -15,10 +15,18 @@ export function useAuthTokens() {
   return { access, refresh };
 }
 
+/** During SSR the relative public apiBase resolves against the Nuxt server itself,
+ * so use the internal base (docker network) when configured. */
+function apiBaseURL(): string {
+  const config = useRuntimeConfig();
+  if (import.meta.server && config.apiInternalBase) return config.apiInternalBase as string;
+  return config.public.apiBase;
+}
+
 let refreshing: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
-  const { apiBase } = useRuntimeConfig().public;
+  const apiBase = apiBaseURL();
   const { access, refresh } = useAuthTokens();
   if (!refresh.value) return false;
 
@@ -48,7 +56,7 @@ export async function apiFetch<T>(
   path: string,
   options: Parameters<typeof $fetch>[1] = {},
 ): Promise<T> {
-  const { apiBase } = useRuntimeConfig().public;
+  const apiBase = apiBaseURL();
   const { access } = useAuthTokens();
 
   const doFetch = () =>

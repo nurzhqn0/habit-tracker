@@ -24,6 +24,8 @@ const loading = ref(true);
 
 const isOwner = computed(() => room.value?.owner_id === auth.user?.id);
 
+useHead({ title: computed(() => room.value?.name ?? "Room") });
+
 const inviteOpen = ref(false);
 const inviteLink = ref("");
 const habitFormOpen = ref(false);
@@ -100,8 +102,10 @@ async function createRoomHabit() {
 
 async function openLinkPicker(item: RoomHabitWithLink) {
   linkPickerFor.value = item;
+  // Only same-type habits not already linked to a habit in this room.
+  const linkedIds = new Set(habits.value.map((h) => h.linked_habit_id).filter(Boolean));
   myHabits.value = (await apiFetch<Habit[]>("/habits", { query: { archived: false } })).filter(
-    (h) => h.type === item.habit.type,
+    (h) => h.type === item.habit.type && !linkedIds.has(h.id),
   );
 }
 
@@ -142,9 +146,18 @@ async function removeMember(member: RoomMember) {
   }
 }
 
+const deleteRoomOpen = ref(false);
+
 async function deleteRoom() {
+  deleteRoomOpen.value = false;
   await apiFetch(`/rooms/${roomId}`, { method: "DELETE" });
   router.replace("/app/rooms");
+}
+
+function linkTypeLabel(item: RoomHabitWithLink): string {
+  if (item.habit.type !== 1) return "Yes / No";
+  const direction = item.habit.target_type === 0 ? "at least" : "at most";
+  return `Measurable · ${direction} ${item.habit.target_value} ${item.habit.unit}`.trim();
 }
 
 function feedText(event: FeedEvent): string {
@@ -193,7 +206,7 @@ const tabs = [
             color="error"
             variant="ghost"
             aria-label="Delete room"
-            @click="deleteRoom"
+            @click="deleteRoomOpen = true"
           />
         </template>
       </UDashboardNavbar>
@@ -405,28 +418,60 @@ const tabs = [
         </template>
       </UModal>
 
-      <UModal :open="!!linkPickerFor" title="Link a habit" @update:open="linkPickerFor = null">
+      <UModal
+        :open="!!linkPickerFor"
+        :title="`Link a habit to “${linkPickerFor?.habit.name}”`"
+        @update:open="linkPickerFor = null"
+      >
         <template #body>
           <div class="flex flex-col gap-3">
+            <UBadge v-if="linkPickerFor" variant="subtle" color="neutral" class="self-start">
+              {{ linkTypeLabel(linkPickerFor) }}
+            </UBadge>
+
             <UButton
               icon="i-lucide-plus"
               :label="`Create “${linkPickerFor?.habit.name}” from template`"
               variant="subtle"
               block
+              :loading="busy"
               @click="link(null)"
             />
+
             <template v-if="myHabits.length">
               <p class="text-xs uppercase tracking-wide text-dimmed">or link an existing habit</p>
               <UButton
                 v-for="habit in myHabits"
                 :key="habit.id"
-                :label="habit.name"
                 color="neutral"
                 variant="outline"
                 block
+                :loading="busy"
                 @click="link(habit.id)"
-              />
+              >
+                <span
+                  class="size-2.5 shrink-0 rounded-full"
+                  :style="{ backgroundColor: paletteColor(habit.color) }"
+                />
+                <span class="truncate">{{ habit.name }}</span>
+              </UButton>
             </template>
+            <p v-else class="text-xs text-muted">
+              No compatible habits to link — create one from the template above.
+            </p>
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="deleteRoomOpen"
+        :title="`Delete “${room?.name}”?`"
+        description="The room, its habits and feed will be removed for every member. This cannot be undone."
+      >
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton label="Cancel" color="neutral" variant="ghost" @click="deleteRoomOpen = false" />
+            <UButton label="Delete room" color="error" icon="i-lucide-trash-2" @click="deleteRoom" />
           </div>
         </template>
       </UModal>
