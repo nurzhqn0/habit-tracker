@@ -8,6 +8,7 @@ useHead({ title: "Join room" });
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const view = useRoomViewStore();
 const failed = ref(false);
 
 onMounted(async () => {
@@ -17,6 +18,7 @@ onMounted(async () => {
       body: { code: String(route.params.code) },
     });
     toast.add({ title: `Joined ${room.name}`, color: "success" });
+    view.viewedRoom = room;
     router.replace(`/app/rooms/${room.id}`);
   } catch {
     failed.value = true;

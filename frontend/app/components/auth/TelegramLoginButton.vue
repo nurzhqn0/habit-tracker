@@ -5,7 +5,14 @@
 const { tgClientId } = useRuntimeConfig().public;
 const auth = useAuthStore();
 const toast = useToast();
+const route = useRoute();
 const ready = ref(false);
+
+function afterLogin() {
+  const redirect = route.query.redirect;
+  const target = typeof redirect === "string" && redirect.startsWith("/app") ? redirect : "/app";
+  navigateTo(target);
+}
 
 async function onAuth(data: { id_token?: string; error?: string }) {
   if (!data?.id_token) {
@@ -14,7 +21,7 @@ async function onAuth(data: { id_token?: string; error?: string }) {
   }
   try {
     await auth.loginWithTelegram(data.id_token);
-    navigateTo("/app");
+    afterLogin();
   } catch {
     toast.add({ title: "Login failed", description: "Could not verify Telegram data.", color: "error" });
   }
@@ -36,7 +43,7 @@ function openLogin() {
 async function devLogin() {
   try {
     await auth.loginTestMode();
-    navigateTo("/app");
+    afterLogin();
   } catch {
     toast.add({ title: "Dev login failed", description: "Backend TEST_MODE is off.", color: "error" });
   }

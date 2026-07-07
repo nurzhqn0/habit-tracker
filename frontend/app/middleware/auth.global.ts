@@ -8,5 +8,5 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Not ready here means /me failed transiently (backend restart, network
   // blip) — let the user in and retry on the next navigation. A definitive
   // rejection (or no tokens at all) leaves the store ready with no user.
-  if (auth.ready) return navigateTo("/");
+  if (auth.ready) return navigateTo({ path: "/", query: { redirect: to.fullPath } });
 });

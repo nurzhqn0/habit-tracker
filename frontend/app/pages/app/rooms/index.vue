@@ -6,8 +6,14 @@ definePageMeta({ layout: "dashboard" });
 useHead({ title: "Rooms" });
 
 const toast = useToast();
+const view = useRoomViewStore();
 const rooms = ref<Room[]>([]);
 const loading = ref(true);
+
+function openRoom(room: Room) {
+  view.viewedRoom = room;
+  navigateTo(`/app/rooms/${room.id}`);
+}
 
 const createOpen = ref(false);
 const joinOpen = ref(false);
@@ -34,7 +40,7 @@ async function createRoom() {
     createOpen.value = false;
     newRoom.name = "";
     newRoom.description = "";
-    navigateTo(`/app/rooms/${room.id}`);
+    openRoom(room);
   } catch {
     toast.add({ title: "Could not create room", color: "error" });
   } finally {
@@ -52,7 +58,7 @@ async function joinRoom() {
     });
     joinOpen.value = false;
     joinCode.value = "";
-    navigateTo(`/app/rooms/${room.id}`);
+    openRoom(room);
   } catch {
     toast.add({ title: "Invalid invite code", color: "error" });
   } finally {
@@ -97,7 +103,12 @@ async function joinRoom() {
       </div>
 
       <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <NuxtLink v-for="room in rooms" :key="room.id" :to="`/app/rooms/${room.id}`">
+        <NuxtLink
+          v-for="room in rooms"
+          :key="room.id"
+          :to="`/app/rooms/${room.id}`"
+          @click="view.viewedRoom = room"
+        >
           <UCard class="h-full transition hover:ring-2 hover:ring-primary">
             <div class="flex items-start gap-3">
               <UIcon name="i-lucide-users" class="mt-1 size-5 text-primary" />

@@ -21,7 +21,7 @@ const tab = computed({
   },
 });
 
-const room = ref<Room | null>(null);
+const room = ref<Room | null>(view.viewedRoom?.id === roomId ? view.viewedRoom : null);
 const habits = ref<RoomHabitWithLink[]>([]);
 const members = ref<RoomMember[]>([]);
 const leaderboard = ref<LeaderboardRow[]>([]);
@@ -83,15 +83,34 @@ onMounted(async () => {
 
 watch(period, loadLeaderboard);
 
-async function showInvite() {
-  const result = await apiFetch<{ invite_code: string; link: string }>(
-    `/rooms/${roomId}/invite/rotate`,
-    { method: "POST" },
-  );
-  inviteLink.value = result.link;
+function joinLink(code: string): string {
+  return `${window.location.origin}/app/rooms/join/${code}`;
+}
+
+function showInvite() {
+  if (!room.value) return;
+  inviteLink.value = joinLink(room.value.invite_code);
   inviteUsername.value = "";
   inviteResult.value = null;
   inviteOpen.value = true;
+}
+
+const rotateBusy = ref(false);
+
+async function rotateInvite() {
+  rotateBusy.value = true;
+  try {
+    const result = await apiFetch<{ invite_code: string }>(`/rooms/${roomId}/invite/rotate`, {
+      method: "POST",
+    });
+    if (room.value) room.value.invite_code = result.invite_code;
+    inviteLink.value = joinLink(result.invite_code);
+    toast.add({ title: "Link rotated — older links no longer work", color: "success" });
+  } catch {
+    toast.add({ title: "Could not rotate link", color: "error" });
+  } finally {
+    rotateBusy.value = false;
+  }
 }
 
 interface InviteResult {
@@ -320,9 +339,13 @@ function openMember(member: RoomMember) {
 <template>
   <UDashboardPanel id="room-detail">
     <template #header>
-      <UDashboardNavbar :title="room?.name ?? 'Room'" :toggle="false">
+      <UDashboardNavbar :toggle="false">
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app/rooms" aria-label="Back" />
+        </template>
+        <template #title>
+          <span v-if="room">{{ room.name }}</span>
+          <USkeleton v-else class="h-5 w-32" />
         </template>
         <template #right>
           <UButton
@@ -549,11 +572,21 @@ function openMember(member: RoomMember) {
       <UModal v-model:open="inviteOpen" title="Invite friends">
         <template #body>
           <p class="mb-3 text-sm text-muted">
-            Share this link — it was just rotated, so older links no longer work.
+            Share this link — anyone with it can join the room.
           </p>
           <div class="flex gap-2">
             <UInput :model-value="inviteLink" readonly class="flex-1" />
             <UButton icon="i-lucide-copy" aria-label="Copy" @click="copyInvite" />
+            <UTooltip text="Rotate the link — older links stop working">
+              <UButton
+                icon="i-lucide-refresh-cw"
+                color="neutral"
+                variant="subtle"
+                aria-label="Rotate link"
+                :loading="rotateBusy"
+                @click="rotateInvite"
+              />
+            </UTooltip>
           </div>
 
           <USeparator label="or" class="my-4" />
