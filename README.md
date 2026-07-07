@@ -1,24 +1,84 @@
-# HabitFlow
+<h1 align="center">HabitFlow</h1>
 
-A web rebuild of [Loop Habit Tracker (uHabits)](https://github.com/iSoron/uhabits) with
-collaboration on top: track yes/no and measurable habits, watch your habit strength grow
-with the exact uHabits scoring algorithm, and stay accountable with friends in shared rooms.
-Reminders arrive as Telegram messages — mark habits done right from the chat.
+<p align="center">
+  <a href="https://github.com/nurzhqn0/habit-tracker">
+    <img alt="GitHub" src="https://img.shields.io/badge/GitHub-habit--tracker-blue" />
+  </a>
+  <a href="https://github.com/iSoron/uhabits">
+    <img alt="Engine" src="https://img.shields.io/badge/engine-uHabits%20port-brightgreen" />
+  </a>
+</p>
+
+HabitFlow is a web app that helps you create and maintain good habits — together
+with your friends. It is a full web rebuild of [Loop Habit Tracker
+(uHabits)](https://github.com/iSoron/uhabits), powered by a line-by-line port of
+the original habit engine, with shared rooms, leaderboards, and a Telegram bot
+on top. Detailed charts and statistics show you how your habits improved over
+time.
+
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/1.png" width="49%" alt="Main habit grid" />
+  <img src="screenshots/2.png" width="49%" alt="Habit detail and charts" />
+</p>
+<p align="center">
+  <img src="screenshots/3.png" width="49%" alt="Rooms" />
+  <img src="screenshots/4.png" width="49%" alt="Room leaderboard" />
+</p>
+<p align="center">
+  <img src="screenshots/5.png" width="49%" alt="Settings" />
+</p>
+
+<p align="center">
+  <img src="screenshots/6.jpg" width="19%" alt="Mobile habit grid" />
+  <img src="screenshots/7.jpg" width="19%" alt="Mobile habit detail" />
+  <img src="screenshots/8.jpg" width="19%" alt="Mobile room" />
+  <img src="screenshots/9.jpg" width="19%" alt="Mobile history" />
+  <img src="screenshots/10.jpg" width="19%" alt="Telegram bot" />
+</p>
 
 ## Features
 
-- **Habits**: yes/no + measurable (at-least / at-most targets with units), flexible
-  frequencies (daily, N× per week, every N days, monthly), skip days, question marks,
-  per-entry notes, archive, 20-color palette, manual ordering + sorting.
-- **Statistics**: habit strength score (exponential moving average, ported 1:1 from
-  uHabits with golden tests), streaks, calendar heatmap, score/bar/weekday charts,
-  target progress — all custom SVG, dark-theme aware.
-- **Rooms**: share habit definitions with friends, link your own habits to them,
-  per-room leaderboard (score / streak / completions) and activity feed.
-- **Telegram**: Login Widget auth (no passwords), bot reminders per habit time +
-  weekday mask in your timezone, inline ✅ Done / ⏭ Skip / 🕐 Later buttons,
-  room activity notifications.
-- **Data**: Loop-format CSV export/import (ZIP), Excel export.
+* **The original Loop engine, on the web.** HabitFlow's scoring is a
+  line-by-line Python port of uHabits' habit engine. Every repetition makes
+  your habit stronger, and every missed day makes it weaker. A few missed days
+  after a long streak, however, will not completely destroy your progress. The
+  port is verified against 38 golden tests transcribed from the uHabits test
+  suite, with parity at 1e-6 — your scores match the original app exactly.
+
+* **Habit rooms.** Habits are easier to keep when you don't keep them alone.
+  Create a room, invite friends by link or Telegram username, attach shared
+  habits, and compete on a per-room leaderboard (score, streak, or
+  completions). An activity feed shows who checked in, and owner/admin/member
+  roles let you manage the room together.
+
+* **Telegram-native.** No passwords and no registration forms — log in with
+  your Telegram account in one tap. A companion bot sends reminders at each
+  habit's chosen time, in your own timezone, on the days you pick. Check off
+  or skip your habit directly from the chat with inline ✅ Done / ⏭ Skip /
+  🕐 Later buttons.
+
+* **Flexible habits and schedules.** Yes/no and measurable habits (at-least /
+  at-most targets with units), daily or more complex schedules such as 3 times
+  per week or every N days, skip days, per-entry notes, archiving, manual
+  ordering, and the classic 20-color uHabits palette.
+
+* **Detailed charts and statistics.** Habit strength score, streaks, calendar
+  heatmap, score history, weekday breakdown, and target progress — all
+  custom-built SVG, dark-theme aware, and always computed on the fly from your
+  raw check-ins. Scores and streaks are derived, never persisted.
+
+* **Take control of your data.** Export any habit or room to Excel reports for
+  a chosen period, or to Loop-compatible CSV (ZIP) — and import your existing
+  history straight from the Android app, so years of progress carry over.
+
+* **No limitations.** Track as many habits as you wish. All features are
+  available to all users. There are no advertisements and no in-app purchases.
+
+* **Self-hostable and private.** The entire stack — web app, API, bot, and
+  database — ships as a single Docker Compose file. Your data lives in a
+  SQLite file on your own server and is never sent to anyone.
 
 ## Stack
 
@@ -29,6 +89,22 @@ Reminders arrive as Telegram messages — mark habits done right from the chat.
 | Bot | aiogram 3 worker process + APScheduler |
 | Auth | Telegram Login Widget (HMAC-verified) → JWT access + rotating refresh tokens |
 | Deploy | Docker Compose: nginx reverse proxy + api + bot + frontend, shared SQLite volume |
+
+## Installing
+
+The easiest way to run HabitFlow is with Docker Compose:
+
+```bash
+cp .env.example .env            # set JWT_SECRET (openssl rand -hex 32), BOT_TOKEN, BOT_USERNAME,
+                                # FRONTEND_ORIGIN=https://your-domain
+make up                         # nginx on :80 (and :443 once TLS is configured)
+```
+
+The Telegram Login Widget requires your domain to be linked to the bot via
+[@BotFather](https://t.me/BotFather) → `/setdomain`.
+
+For a full walkthrough — blank Ubuntu server to live HTTPS deployment, with
+certs, bot setup, backups, and updates — see [DEPLOY.md](DEPLOY.md).
 
 ## Development
 
@@ -46,53 +122,65 @@ make web                        # Nuxt on :3000
 make bot                        # Telegram bot worker (optional)
 ```
 
-No bot configured? Set `TEST_MODE=true` for the backend and the landing page shows a
-**Dev login** button instead of the Telegram widget.
+No bot configured? Set `TEST_MODE=true` for the backend and the landing page
+shows a **Dev login** button instead of the Telegram widget.
 
 Seed demo data: `cd backend && uv run python scripts/seed.py`
 
-## Tests
+Run the tests:
 
 ```bash
-make test                       # backend: 79 tests (38 golden engine tests transcribed
-                                # from the uHabits test suite, engine parity at 1e-6)
+make test                       # backend tests, incl. 38 golden engine tests (parity at 1e-6)
 cd frontend && npx playwright test   # e2e smoke: login → habit → toggles → charts → room
 ```
 
-## Production
-
-```bash
-cp .env.example .env            # set JWT_SECRET (openssl rand -hex 32), BOT_TOKEN, BOT_USERNAME,
-                                # FRONTEND_ORIGIN=https://your-domain
-make up                         # docker compose: nginx on :80 (and :443 once TLS is configured)
-```
-
-Production guards (enforced at startup when `ENVIRONMENT=production`, the compose default):
-JWT_SECRET must be ≥32 chars and not the dev default; `TEST_MODE` must be off; API docs
-(`/docs`, `/openapi.json`) are disabled. Uvicorn trusts `X-Forwarded-For` from nginx so
-rate limiting sees real client IPs.
-
-**TLS**: drop `fullchain.pem` + `privkey.pem` into `nginx/certs/`, then
-`cp nginx/nginx-tls.conf.example nginx/nginx.conf`, set your domain in it, and
-`docker compose restart nginx`. HSTS is enabled in the TLS config.
-
-**Backups**: `make backup` — consistent SQLite snapshot (WAL-safe) into `backups/`.
-
-**CI**: GitHub Actions runs backend lint+tests+pip-audit, frontend build+npm audit,
-and the Playwright e2e smoke on every push/PR.
-
-The Telegram Login Widget requires your domain to be linked to the bot via
-[@BotFather](https://t.me/BotFather) → `/setdomain`.
-
-**Full VPS walkthrough** (blank Ubuntu server → live HTTPS deployment, certs,
-bot setup, backups, updates): see [DEPLOY.md](DEPLOY.md).
-
 ## Architecture notes
 
-- Scores, streaks, and auto-filled entries are **derived, never persisted** — SQLite
-  stores only habits and raw entries, mirroring uHabits' design. The engine lives in
-  `backend/app/domain/services/` as pure functions (no IO), ported line-by-line from
-  `uhabits-core` (`ScoreList.kt`, `StreakList.kt`, `EntryList.kt`).
-- The bot runs as a separate process sharing the SQLite file via WAL; the API never
-  performs Telegram IO — room notifications are written as activity events and tailed
-  by the bot worker.
+- Scores, streaks, and auto-filled entries are **derived, never persisted** —
+  SQLite stores only habits and raw entries, mirroring uHabits' design. The
+  engine lives in `backend/app/domain/services/` as pure functions (no IO),
+  ported line-by-line from `uhabits-core` (`ScoreList.kt`, `StreakList.kt`,
+  `EntryList.kt`).
+- The bot runs as a separate process sharing the SQLite file via WAL; the API
+  never performs Telegram IO — room notifications are written as activity
+  events and tailed by the bot worker.
+
+## Contributing
+
+HabitFlow is a hobby project, and contributions are very welcome. There are
+several ways to help, even if you are not a developer:
+
+* **Report bugs, suggest features.** The easiest way to contribute is to simply
+  use the app and let me know if you find any problems or have any suggestions
+  to improve it — please [open an issue](https://github.com/nurzhqn0/habit-tracker/issues).
+
+* **Write some code.** Pull requests are welcome. Set up a local environment
+  with the [Development](#development) instructions above, and make sure
+  `make test` and `make lint` pass before submitting. For larger changes,
+  please open an issue first to discuss the idea.
+
+* **Spread the word.** If you like the project, star the repository and share
+  it with your friends and colleagues.
+
+## Acknowledgments
+
+HabitFlow would not exist without [Loop Habit
+Tracker](https://github.com/iSoron/uhabits) by Álinson Santos Xavier and its
+contributors. The habit engine, scoring formula, entry semantics, and color
+palette are ported from the original project.
+
+## License
+
+Copyright (C) 2026 Nurzhan Izimbetov nurzhqn@gmail.com
+
+HabitFlow is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+HabitFlow is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
