@@ -171,11 +171,6 @@ const botLink = computed(() => (botUsername ? `https://t.me/${botUsername}?start
               label="Habit reminders"
               @update:model-value="(v: boolean) => save({ reminders_enabled: v })"
             />
-            <USwitch
-              :model-value="prefs.room_notifications"
-              label="Room activity notifications"
-              @update:model-value="(v: boolean) => save({ room_notifications: v })"
-            />
           </div>
         </UCard>
 
