@@ -35,6 +35,11 @@ const isOwner = computed(() => room.value?.owner_id === auth.user?.id);
 const myRole = computed(() => members.value.find((m) => m.user_id === auth.user?.id)?.role);
 const isAdmin = computed(() => isOwner.value || myRole.value === "admin");
 
+const roomFilePrefix = computed(() => {
+  const slug = (room.value?.name ?? String(roomId)).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return `room-${slug}-report`;
+});
+
 useHead({ title: computed(() => room.value?.name ?? "Room") });
 
 const inviteOpen = ref(false);
@@ -348,6 +353,11 @@ function openMember(member: RoomMember) {
           <USkeleton v-else class="h-5 w-32" />
         </template>
         <template #right>
+          <ExportMenu
+            v-if="isAdmin"
+            :path="`/rooms/${roomId}/export/xlsx`"
+            :filename-prefix="roomFilePrefix"
+          />
           <UButton
             v-if="isAdmin"
             icon="i-lucide-user-plus"

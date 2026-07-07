@@ -288,7 +288,11 @@ def _is_success(habit_row: HabitRow, value: int) -> bool:
 
 
 async def leaderboard(
-    session: AsyncSession, user_id: int, room_id: int, period: str = "week"
+    session: AsyncSession,
+    user_id: int,
+    room_id: int,
+    period: str = "week",
+    window: tuple[Date, Date] | None = None,
 ) -> list[LeaderboardRow]:
     await _require_member(session, room_id, user_id)
     repo = RoomRepo(session)
@@ -307,12 +311,14 @@ async def leaderboard(
     for membership, user in members:
         prefs = await user_repo.get_or_create_preferences(user.id)
         today = habit_math.user_today(prefs)
-        if period == "week":
-            since = today - timedelta(days=6)
+        if window is not None:
+            since, until = window
+        elif period == "week":
+            since, until = today - timedelta(days=6), today
         elif period == "month":
-            since = today - timedelta(days=29)
+            since, until = today - timedelta(days=29), today
         else:
-            since = Date(1970, 1, 1)
+            since, until = Date(1970, 1, 1), today
 
         best_score = 0.0
         best_streak = 0
@@ -332,7 +338,7 @@ async def leaderboard(
             completions += sum(
                 1
                 for d, e in computed.items()
-                if since <= d <= today and _is_success(habit_row, e.value)
+                if since <= d <= until and _is_success(habit_row, e.value)
             )
 
         rows.append(

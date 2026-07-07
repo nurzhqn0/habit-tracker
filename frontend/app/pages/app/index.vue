@@ -154,6 +154,7 @@ async function onDragEnd() {
               @change="load"
             />
           </UTooltip>
+          <ExportMenu path="/export/report/xlsx" filename-prefix="habits-report" />
           <UDropdownMenu :items="sortItems">
             <UButton icon="i-lucide-arrow-up-down" color="neutral" variant="ghost" aria-label="Sort" />
           </UDropdownMenu>

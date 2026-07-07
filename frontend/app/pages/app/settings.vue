@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Preferences } from "~~/shared/types/api";
-import { apiFetch, useAuthTokens } from "~/services/api/client";
+import { apiFetch } from "~/services/api/client";
 
 definePageMeta({ layout: "dashboard" });
 useHead({ title: "Settings" });
@@ -8,7 +8,8 @@ useHead({ title: "Settings" });
 const toast = useToast();
 const auth = useAuthStore();
 const colorMode = useColorMode();
-const { botUsername, apiBase } = useRuntimeConfig().public;
+const { botUsername } = useRuntimeConfig().public;
+const { download } = useDownload();
 
 const prefs = ref<Preferences | null>(null);
 const importing = ref(false);
@@ -33,25 +34,6 @@ async function save(patch: Partial<Preferences>) {
     if (patch.theme) colorMode.preference = patch.theme;
   } catch {
     toast.add({ title: "Could not save preferences", color: "error" });
-  }
-}
-
-async function download(path: string, filename: string) {
-  const { access } = useAuthTokens();
-  try {
-    const blob = await $fetch<Blob>(path, {
-      baseURL: apiBase as string,
-      responseType: "blob",
-      headers: access.value ? { Authorization: `Bearer ${access.value}` } : {},
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  } catch {
-    toast.add({ title: "Export failed", color: "error" });
   }
 }
 
