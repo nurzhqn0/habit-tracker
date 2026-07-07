@@ -59,6 +59,8 @@ function initWidget() {
   ready.value = true;
 }
 
+let loadTimer: ReturnType<typeof setTimeout> | undefined;
+
 function mountWidget() {
   failed.value = false;
   // Script may already be present from a previous visit to this page.
@@ -66,14 +68,22 @@ function mountWidget() {
     initWidget();
     return;
   }
+  // A stalled request fires neither onload nor onerror, which used to leave
+  // the button disabled (spinner) forever — surface the retry UI instead.
+  clearTimeout(loadTimer);
+  loadTimer = setTimeout(() => {
+    if (!ready.value) failed.value = true;
+  }, 8000);
   const script = document.createElement("script");
   script.src = "https://oauth.telegram.org/js/telegram-login.js?5";
   script.async = true;
   script.onload = () => {
+    clearTimeout(loadTimer);
     if ((window as any).Telegram?.Login) initWidget();
     else failed.value = true;
   };
   script.onerror = () => {
+    clearTimeout(loadTimer);
     script.remove();
     failed.value = true;
   };
@@ -83,6 +93,8 @@ function mountWidget() {
 onMounted(() => {
   if (tgClientId) mountWidget();
 });
+
+onUnmounted(() => clearTimeout(loadTimer));
 </script>
 
 <template>
