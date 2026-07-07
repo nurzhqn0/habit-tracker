@@ -5,6 +5,7 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import habit_math
+from app.application.use_cases import habits as habits_uc
 from app.domain.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.domain.models.entry import SKIP, YES_MANUAL
 from app.infrastructure.db.tables import HabitLinkRow, HabitRow, RoomHabitRow, RoomRow
@@ -349,6 +350,42 @@ async def leaderboard(
 
     rows.sort(key=lambda r: (-r.score, -r.completions, -r.streak))
     return rows
+
+
+async def authorize_member_habit(
+    session: AsyncSession, caller_id: int, room_id: int, member_id: int, habit_id: int
+) -> None:
+    """Read access for room admins/owners to a member's habit, only if linked into this room."""
+    await _require_admin(session, room_id, caller_id)
+    repo = RoomRepo(session)
+    if await repo.membership(room_id, member_id) is None:
+        raise NotFoundError("Member not found")
+    link = await repo.link_for_habit(habit_id)
+    if link is None or link.user_id != member_id:
+        raise NotFoundError("Habit not found")
+    room_habit = await session.get(RoomHabitRow, link.room_habit_id)
+    if room_habit is None or room_habit.room_id != room_id:
+        raise NotFoundError("Habit not found")
+
+
+async def member_overview(
+    session: AsyncSession,
+    caller_id: int,
+    room_id: int,
+    member_id: int,
+    from_date: Date,
+    to_date: Date,
+) -> list[habits_uc.HabitOverviewItem]:
+    await _require_admin(session, room_id, caller_id)
+    repo = RoomRepo(session)
+    if await repo.membership(room_id, member_id) is None:
+        raise NotFoundError("Member not found")
+    room_habits = await repo.room_habits(room_id)
+    links = await repo.links_for_room_habits([rh.id for rh in room_habits])
+    habit_ids = [link.habit_id for link in links if link.user_id == member_id]
+    return await habits_uc.get_overview(
+        session, member_id, from_date, to_date, include_archived=True, habit_ids=habit_ids
+    )
 
 
 async def record_entry_activity(

@@ -5,6 +5,7 @@ const props = defineProps<{
   value: number | undefined;
   color: string;
   showQuestionMarks: boolean;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{ toggle: [] }>();
@@ -32,8 +33,10 @@ const display = computed(() => {
   <button
     type="button"
     data-testid="check-cell"
-    class="flex size-9 items-center justify-center rounded-md transition hover:bg-elevated active:scale-90"
-    @click="emit('toggle')"
+    :disabled="readonly"
+    class="flex size-9 items-center justify-center rounded-md"
+    :class="readonly ? '' : 'transition hover:bg-elevated active:scale-90'"
+    @click="!readonly && emit('toggle')"
   >
     <UIcon :name="display.icon" class="size-5" :class="display.cls" :style="display.style" />
   </button>

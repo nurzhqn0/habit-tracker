@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.tests.integration.conftest import bearer, login
 
@@ -354,3 +354,116 @@ async def test_invite_by_username(client):
     result = (await client.post(url, json={"username": "@ALICE5031"}, headers=owner)).json()
     assert result["status"] == "already_member"
     assert result["username"] == "ALICE5031"
+
+
+STATS_PATHS = [
+    "stats/overview", "stats/scores", "stats/history", "stats/bar", "stats/weekdays",
+    "stats/frequency", "stats/streaks", "stats/target", "stats/notes",
+]
+
+
+async def test_member_habits_view_auth_matrix(client):
+    owner = bearer(await login(client, 5040))
+    admin_tokens = await login(client, 5041)
+    admin = bearer(admin_tokens)
+    admin_id = admin_tokens["user"]["id"]
+    member_tokens = await login(client, 5042)
+    member = bearer(member_tokens)
+    member_id = member_tokens["user"]["id"]
+    outsider = bearer(await login(client, 5043))
+
+    room = await make_room(client, owner)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=admin)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+    await client.patch(
+        f"/rooms/{room['id']}/members/{admin_id}", json={"role": "admin"}, headers=owner
+    )
+
+    room_habit = (
+        await client.post(f"/rooms/{room['id']}/habits", json={"name": "Read"}, headers=owner)
+    ).json()
+    habit_id = (
+        await client.post(f"/rooms/{room['id']}/habits/{room_habit['id']}/link", json={}, headers=member)
+    ).json()["habit_id"]
+    await client.post(f"/habits/{habit_id}/entries/{TODAY}/toggle", headers=member)
+    unlinked = (await client.post("/habits", json={"name": "Private"}, headers=member)).json()
+
+    base = f"/rooms/{room['id']}/members/{member_id}"
+    window = {"from": str(TODAY - timedelta(days=6)), "to": str(TODAY)}
+
+    # Plain member and outsider are denied.
+    assert (await client.get(f"{base}/overview", params=window, headers=member)).status_code == 403
+    assert (await client.get(f"{base}/overview", params=window, headers=outsider)).status_code == 404
+    assert (
+        await client.get(f"{base}/habits/{habit_id}/stats/overview", headers=outsider)
+    ).status_code == 404
+    assert (
+        await client.get(f"{base}/habits/{habit_id}/stats/overview", headers=member)
+    ).status_code == 403
+
+    # Admin and owner see exactly the linked habit.
+    for viewer in (admin, owner):
+        response = await client.get(f"{base}/overview", params=window, headers=viewer)
+        assert response.status_code == 200, response.text
+        items = response.json()
+        assert [i["habit"]["id"] for i in items] == [habit_id]
+        assert items[0]["entries"][str(TODAY)] == 2
+        assert items[0]["score"] > 0
+
+    # Admin can read habit info and every stats endpoint for the linked habit.
+    info = await client.get(f"{base}/habits/{habit_id}", headers=admin)
+    assert info.status_code == 200
+    assert info.json()["id"] == habit_id
+    for path in STATS_PATHS:
+        assert (
+            await client.get(f"{base}/habits/{habit_id}/{path}", headers=admin)
+        ).status_code == 200, path
+
+    # The member's unlinked personal habit stays invisible.
+    assert (await client.get(f"{base}/habits/{unlinked['id']}", headers=admin)).status_code == 404
+    assert (
+        await client.get(f"{base}/habits/{unlinked['id']}/stats/overview", headers=admin)
+    ).status_code == 404
+
+
+async def test_member_habit_view_cross_room_denied(client):
+    owner = bearer(await login(client, 5050))
+    member_tokens = await login(client, 5051)
+    member = bearer(member_tokens)
+    member_id = member_tokens["user"]["id"]
+
+    room_x = await make_room(client, owner, name="Room X")
+    room_y = await make_room(client, owner, name="Room Y")
+    await client.post("/rooms/join", json={"code": room_y["invite_code"]}, headers=member)
+    room_habit = (
+        await client.post(f"/rooms/{room_y['id']}/habits", json={"name": "Run"}, headers=owner)
+    ).json()
+    habit_id = (
+        await client.post(
+            f"/rooms/{room_y['id']}/habits/{room_habit['id']}/link", json={}, headers=member
+        )
+    ).json()["habit_id"]
+
+    window = {"from": str(TODAY - timedelta(days=6)), "to": str(TODAY)}
+
+    # Not a member of room X yet.
+    assert (
+        await client.get(
+            f"/rooms/{room_x['id']}/members/{member_id}/overview", params=window, headers=owner
+        )
+    ).status_code == 404
+
+    # After joining room X with no links there: empty overview, and the room-Y habit
+    # is not reachable through the room-X path.
+    await client.post("/rooms/join", json={"code": room_x["invite_code"]}, headers=member)
+    response = await client.get(
+        f"/rooms/{room_x['id']}/members/{member_id}/overview", params=window, headers=owner
+    )
+    assert response.status_code == 200
+    assert response.json() == []
+    assert (
+        await client.get(
+            f"/rooms/{room_x['id']}/members/{member_id}/habits/{habit_id}/stats/overview",
+            headers=owner,
+        )
+    ).status_code == 404

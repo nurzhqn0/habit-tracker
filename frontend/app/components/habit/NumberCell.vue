@@ -5,6 +5,7 @@ const props = defineProps<{
   targetType: 0 | 1;
   color: string;
   unit: string;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{ save: [value: number] }>();
@@ -33,7 +34,15 @@ function save() {
 </script>
 
 <template>
-  <UPopover v-model:open="open">
+  <div
+    v-if="readonly"
+    class="flex h-9 min-w-9 items-center justify-center rounded-md px-1 text-xs tabular-nums"
+    :class="reached ? 'font-bold' : 'text-dimmed'"
+    :style="reached ? { color } : {}"
+  >
+    {{ real !== null ? real : "–" }}
+  </div>
+  <UPopover v-else v-model:open="open">
     <button
       type="button"
       class="flex h-9 min-w-9 items-center justify-center rounded-md px-1 text-xs tabular-nums transition hover:bg-elevated"

@@ -240,8 +240,16 @@ async function transferOwnership() {
 }
 
 function memberMenu(member: RoomMember): DropdownMenuItem[][] {
-  const items: DropdownMenuItem[][] = [];
-  if (isOwner.value) {
+  const items: DropdownMenuItem[][] = [
+    [
+      {
+        label: "View habits",
+        icon: "i-lucide-chart-line",
+        to: `/app/rooms/${roomId}/members/${member.user_id}`,
+      },
+    ],
+  ];
+  if (isOwner.value && member.role !== "owner") {
     items.push([
       member.role === "admin"
         ? { label: "Demote to member", icon: "i-lucide-shield-off", onSelect: () => setRole(member, "member") }
@@ -249,9 +257,11 @@ function memberMenu(member: RoomMember): DropdownMenuItem[][] {
       { label: "Transfer ownership", icon: "i-lucide-crown", onSelect: () => (transferFor.value = member) },
     ]);
   }
-  items.push([
-    { label: "Remove from room", icon: "i-lucide-user-x", color: "error", onSelect: () => removeMember(member) },
-  ]);
+  if ((isOwner.value || member.role === "member") && member.role !== "owner") {
+    items.push([
+      { label: "Remove from room", icon: "i-lucide-user-x", color: "error", onSelect: () => removeMember(member) },
+    ]);
+  }
   return items;
 }
 
@@ -483,31 +493,29 @@ const tabs = [
               <UBadge v-if="member.role === 'owner'" variant="subtle" color="warning" icon="i-lucide-crown">
                 Owner
               </UBadge>
-              <template v-else>
-                <UBadge v-if="member.role === 'admin'" variant="subtle" color="info" icon="i-lucide-shield">
-                  Admin
-                </UBadge>
+              <UBadge v-else-if="member.role === 'admin'" variant="subtle" color="info" icon="i-lucide-shield">
+                Admin
+              </UBadge>
+              <UButton
+                v-if="member.user_id === auth.user?.id && member.role !== 'owner'"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                label="Leave"
+                @click="removeMember(member)"
+              />
+              <UDropdownMenu
+                v-else-if="member.user_id !== auth.user?.id && isAdmin"
+                :items="memberMenu(member)"
+              >
                 <UButton
-                  v-if="member.user_id === auth.user?.id"
                   size="xs"
                   color="neutral"
                   variant="ghost"
-                  label="Leave"
-                  @click="removeMember(member)"
+                  icon="i-lucide-ellipsis-vertical"
+                  aria-label="Member menu"
                 />
-                <UDropdownMenu
-                  v-else-if="isOwner || (isAdmin && member.role === 'member')"
-                  :items="memberMenu(member)"
-                >
-                  <UButton
-                    size="xs"
-                    color="neutral"
-                    variant="ghost"
-                    icon="i-lucide-ellipsis-vertical"
-                    aria-label="Member menu"
-                  />
-                </UDropdownMenu>
-              </template>
+              </UDropdownMenu>
             </div>
           </div>
         </template>

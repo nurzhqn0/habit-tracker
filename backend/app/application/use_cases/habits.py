@@ -85,6 +85,7 @@ async def get_overview(
     to_date: Date,
     include_archived: bool = False,
     sort: str = "manual",
+    habit_ids: list[int] | None = None,
 ) -> list[HabitOverviewItem]:
     """Bulk main-screen payload: every habit + computed entries in range + score + streak."""
     prefs = await UserRepo(session).get_or_create_preferences(user_id)
@@ -93,6 +94,9 @@ async def get_overview(
     rows = await HabitRepo(session).list_for_user(
         user_id, archived=None if include_archived else False
     )
+    if habit_ids is not None:
+        wanted = set(habit_ids)
+        rows = [r for r in rows if r.id in wanted]
     entries_by_habit = await EntryRepo(session).all_for_habits([r.id for r in rows])
 
     items: list[HabitOverviewItem] = []
