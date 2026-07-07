@@ -75,7 +75,7 @@ async function joinRoom() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <UButton icon="i-lucide-log-in" label="Join" color="neutral" variant="subtle" @click="joinOpen = true" />
+          <UButton icon="i-lucide-log-in" label="Join" variant="subtle" @click="joinOpen = true" />
           <UButton icon="i-lucide-plus" label="New room" @click="createOpen = true" />
         </template>
       </UDashboardNavbar>
@@ -109,12 +109,15 @@ async function joinRoom() {
           :to="`/app/rooms/${room.id}`"
           @click="view.viewedRoom = room"
         >
-          <UCard class="h-full transition hover:ring-2 hover:ring-primary">
+          <UCard class="h-28 overflow-hidden transition hover:ring-2 hover:ring-primary sm:h-32">
             <div class="flex items-start gap-3">
-              <UIcon name="i-lucide-users" class="mt-1 size-5 text-primary" />
+              <UIcon name="i-lucide-users" class="mt-1 size-5 shrink-0 text-primary" />
               <div class="min-w-0">
                 <p class="truncate font-semibold text-highlighted">{{ room.name }}</p>
-                <p v-if="room.description" class="mt-1 line-clamp-2 text-sm text-muted">
+                <p
+                  v-if="room.description"
+                  class="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted"
+                >
                   {{ room.description }}
                 </p>
               </div>

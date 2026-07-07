@@ -30,9 +30,10 @@ function runRange() {
       icon="i-lucide-download"
       label="Export"
       color="neutral"
-      variant="subtle"
+      variant="ghost"
       :loading="downloading"
       aria-label="Export"
+      :ui="{ label: 'hidden sm:inline' }"
     />
     <template #content>
       <div class="flex w-72 flex-col gap-2 p-3">

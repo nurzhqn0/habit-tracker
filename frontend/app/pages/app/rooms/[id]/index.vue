@@ -388,7 +388,7 @@ function openMember(member: RoomMember) {
         :items="tabs"
         class="w-full"
         variant="link"
-        :ui="{ list: 'overflow-x-auto', trigger: 'flex-none' }"
+        :ui="{ list: 'overflow-x-auto overflow-y-hidden', trigger: 'flex-none' }"
       >
         <template #habits>
           <div class="flex flex-col gap-3 pt-4">
