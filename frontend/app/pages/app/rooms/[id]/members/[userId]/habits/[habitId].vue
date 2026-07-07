@@ -8,6 +8,7 @@ definePageMeta({ layout: "dashboard" });
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const view = useRoomViewStore();
 const roomId = Number(route.params.id);
 const userId = Number(route.params.userId);
 const habitId = Number(route.params.habitId);
@@ -31,7 +32,11 @@ const loading = ref(true);
 
 const color = computed(() => paletteColor(habit.value?.color ?? 8));
 
-useHead({ title: computed(() => habit.value?.name ?? "Habit") });
+const habitName = computed(
+  () => habit.value?.name ?? (view.viewedHabit?.id === habitId ? view.viewedHabit.name : null),
+);
+
+useHead({ title: computed(() => habitName.value ?? "Habit") });
 
 const frequencyLabel = computed(() => {
   if (!habit.value) return "";
@@ -91,9 +96,13 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 <template>
   <UDashboardPanel id="member-habit-detail">
     <template #header>
-      <UDashboardNavbar :title="habit?.name ?? 'Habit'" :toggle="false">
+      <UDashboardNavbar :toggle="false">
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" :to="backTo" aria-label="Back" />
+        </template>
+        <template #title>
+          <span v-if="habitName">{{ habitName }}</span>
+          <USkeleton v-else class="h-5 w-36" />
         </template>
       </UDashboardNavbar>
     </template>

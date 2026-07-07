@@ -11,7 +11,15 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const auth = useAuthStore();
+const view = useRoomViewStore();
 const roomId = Number(route.params.id);
+
+const tab = computed({
+  get: () => view.activeTabs[roomId] ?? "habits",
+  set: (value: string) => {
+    view.activeTabs[roomId] = value;
+  },
+});
 
 const room = ref<Room | null>(null);
 const habits = ref<RoomHabitWithLink[]>([]);
@@ -245,7 +253,7 @@ function memberMenu(member: RoomMember): DropdownMenuItem[][] {
       {
         label: "View habits",
         icon: "i-lucide-chart-line",
-        to: `/app/rooms/${roomId}/members/${member.user_id}`,
+        onSelect: () => openMember(member),
       },
     ],
   ];
@@ -297,11 +305,16 @@ function feedText(event: FeedEvent): string {
 }
 
 const tabs = [
-  { label: "Habits", slot: "habits", icon: "i-lucide-list-checks" },
-  { label: "Leaderboard", slot: "leaderboard", icon: "i-lucide-trophy" },
-  { label: "Feed", slot: "feed", icon: "i-lucide-activity" },
-  { label: "Members", slot: "members", icon: "i-lucide-users" },
+  { label: "Habits", slot: "habits", value: "habits", icon: "i-lucide-list-checks" },
+  { label: "Leaderboard", slot: "leaderboard", value: "leaderboard", icon: "i-lucide-trophy" },
+  { label: "Feed", slot: "feed", value: "feed", icon: "i-lucide-activity" },
+  { label: "Members", slot: "members", value: "members", icon: "i-lucide-users" },
 ];
+
+function openMember(member: RoomMember) {
+  view.viewedMember = member;
+  navigateTo(`/app/rooms/${roomId}/members/${member.user_id}`);
+}
 </script>
 
 <template>
@@ -338,6 +351,7 @@ const tabs = [
 
       <UTabs
         v-else
+        v-model="tab"
         :items="tabs"
         class="w-full"
         variant="link"
@@ -484,11 +498,22 @@ const tabs = [
 
         <template #members>
           <div class="flex flex-col gap-2 pt-4">
-            <div v-for="member in members" :key="member.user_id" class="flex items-center gap-3 py-1.5">
-              <UAvatar :src="member.photo_url ?? undefined" :alt="member.first_name" size="sm" />
-              <div class="flex-1">
-                <p class="text-sm font-medium text-default">{{ member.first_name }}</p>
-                <p class="text-xs text-muted">@{{ member.username ?? "—" }}</p>
+            <div
+              v-for="member in members"
+              :key="member.user_id"
+              class="flex items-center gap-3 py-1.5"
+              :class="isAdmin ? '-mx-2 rounded-md px-2 hover:bg-elevated/60' : ''"
+            >
+              <div
+                class="flex flex-1 items-center gap-3"
+                :class="isAdmin ? 'cursor-pointer' : ''"
+                @click="isAdmin && openMember(member)"
+              >
+                <UAvatar :src="member.photo_url ?? undefined" :alt="member.first_name" size="sm" />
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-default">{{ member.first_name }}</p>
+                  <p class="text-xs text-muted">@{{ member.username ?? "—" }}</p>
+                </div>
               </div>
               <UBadge v-if="member.role === 'owner'" variant="subtle" color="warning" icon="i-lucide-crown">
                 Owner

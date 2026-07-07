@@ -11,11 +11,14 @@ definePageMeta({ layout: "dashboard" });
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const view = useRoomViewStore();
 const roomId = Number(route.params.id);
 const userId = Number(route.params.userId);
 
 const items = ref<HabitOverviewItem[]>([]);
-const member = ref<RoomMember | null>(null);
+const member = ref<RoomMember | null>(
+  view.viewedMember?.user_id === userId ? view.viewedMember : null,
+);
 const prefs = ref<Preferences | null>(null);
 const loading = ref(true);
 
@@ -41,8 +44,10 @@ async function load() {
 onMounted(async () => {
   prefs.value = await apiFetch<Preferences>("/me/preferences").catch(() => null);
   try {
-    const members = await apiFetch<RoomMember[]>(`/rooms/${roomId}/members`);
-    member.value = members.find((m) => m.user_id === userId) ?? null;
+    if (!member.value) {
+      const members = await apiFetch<RoomMember[]>(`/rooms/${roomId}/members`);
+      member.value = members.find((m) => m.user_id === userId) ?? null;
+    }
     await load();
   } catch {
     toast.add({ title: "Could not load member habits", color: "error" });
@@ -52,6 +57,10 @@ onMounted(async () => {
   loading.value = false;
 });
 
+function openHabit(habit: HabitOverviewItem["habit"]) {
+  view.viewedHabit = { id: habit.id, name: habit.name };
+}
+
 watch(period, () => {
   load().catch(() => toast.add({ title: "Could not load habits", color: "error" }));
 });
@@ -60,7 +69,7 @@ watch(period, () => {
 <template>
   <UDashboardPanel id="member-habits">
     <template #header>
-      <UDashboardNavbar :title="title" :toggle="false">
+      <UDashboardNavbar :toggle="false">
         <template #leading>
           <UButton
             icon="i-lucide-arrow-left"
@@ -70,6 +79,10 @@ watch(period, () => {
             aria-label="Back"
           />
         </template>
+        <template #title>
+          <span v-if="member">{{ member.first_name }} — habits</span>
+          <USkeleton v-else class="h-5 w-36" />
+        </template>
         <template #right>
           <UAvatar
             v-if="member"
@@ -77,6 +90,7 @@ watch(period, () => {
             :alt="member.first_name"
             size="sm"
           />
+          <USkeleton v-else class="size-7 rounded-full" />
           <USelect v-model="period" :items="periodItems" size="sm" class="w-24" aria-label="Period" />
         </template>
       </UDashboardNavbar>
@@ -127,6 +141,7 @@ watch(period, () => {
               <NuxtLink
                 :to="`/app/rooms/${roomId}/members/${userId}/habits/${item.habit.id}`"
                 class="flex min-w-28 flex-1 items-center gap-3 sm:min-w-40"
+                @click="openHabit(item.habit)"
               >
                 <HabitScoreRing :score="item.score" :color="paletteColor(item.habit.color)" />
                 <div class="min-w-0">
