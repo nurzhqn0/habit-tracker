@@ -5,6 +5,12 @@ class TelegramLoginRequest(BaseModel):
     id_token: str
 
 
+class TelegramCodeLoginRequest(BaseModel):
+    code: str
+    code_verifier: str
+    redirect_uri: str
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 

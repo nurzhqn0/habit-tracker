@@ -3,7 +3,12 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.api.deps import SessionDep, SettingsDep
-from app.api.schemas.auth import RefreshRequest, TelegramLoginRequest, TokenResponse
+from app.api.schemas.auth import (
+    RefreshRequest,
+    TelegramCodeLoginRequest,
+    TelegramLoginRequest,
+    TokenResponse,
+)
 from app.application.use_cases import auth as auth_uc
 from app.infrastructure.repositories.user_repo import UserRepo
 
@@ -18,6 +23,20 @@ async def telegram_login(
     request: Request, payload: TelegramLoginRequest, session: SessionDep, settings: SettingsDep
 ) -> TokenResponse:
     result = await auth_uc.telegram_login(session, payload.id_token, settings)
+    return TokenResponse(
+        access_token=result.access_token, refresh_token=result.refresh_token, user=result.user
+    )
+
+
+@router.post("/telegram/code", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def telegram_code_login(
+    request: Request, payload: TelegramCodeLoginRequest, session: SessionDep, settings: SettingsDep
+) -> TokenResponse:
+    """Redirect-flow login for browsers that block the Telegram popup (in-app webviews)."""
+    result = await auth_uc.telegram_code_login(
+        session, payload.code, payload.code_verifier, payload.redirect_uri, settings
+    )
     return TokenResponse(
         access_token=result.access_token, refresh_token=result.refresh_token, user=result.user
     )

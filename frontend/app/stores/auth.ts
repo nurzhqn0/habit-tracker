@@ -26,6 +26,15 @@ export const useAuthStore = defineStore("auth", {
       this._applyTokens(response);
     },
 
+    /** Redirect (authorization code) flow — used where popups are blocked. */
+    async loginWithTelegramCode(code: string, codeVerifier: string, redirectUri: string) {
+      const response = await apiFetch<TokenResponse>("/auth/telegram/code", {
+        method: "POST",
+        body: { code, code_verifier: codeVerifier, redirect_uri: redirectUri },
+      });
+      this._applyTokens(response);
+    },
+
     async loginTestMode() {
       const response = await apiFetch<TokenResponse>("/auth/test-login", { method: "POST" });
       this._applyTokens(response);

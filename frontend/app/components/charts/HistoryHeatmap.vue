@@ -88,6 +88,32 @@ function cellStyle(date: string, future: boolean): Record<string, string> {
   }
 }
 
+const MONTH_GAP = 12; // px, extra space dividing columns that start a new month
+
+// Column indices where a new month begins — they get the divider gap.
+const monthStarts = computed(() => {
+  const starts = new Set<number>();
+  let last = "";
+  columns.value.forEach((column, index) => {
+    const month = column[0]!.date.slice(0, 7);
+    if (index > 0 && month !== last) starts.add(index);
+    last = month;
+  });
+  return starts;
+});
+
+// Left edge of each column in px, accounting for the month divider gaps.
+const columnOffsets = computed(() => {
+  const offsets: number[] = [];
+  let x = 0;
+  columns.value.forEach((_, index) => {
+    if (monthStarts.value.has(index)) x += MONTH_GAP;
+    offsets.push(x);
+    x += COL;
+  });
+  return offsets;
+});
+
 const monthLabels = computed(() => {
   const labels: { index: number; label: string }[] = [];
   let last = "";
@@ -119,13 +145,18 @@ onMounted(() => {
             v-for="m in monthLabels"
             :key="m.index"
             class="absolute text-[10px] font-medium whitespace-nowrap text-muted"
-            :style="{ left: `${m.index * COL}px` }"
+            :style="{ left: `${columnOffsets[m.index]}px` }"
           >
             {{ m.label }}
           </span>
         </div>
         <div class="flex gap-1">
-          <div v-for="(column, ci) in columns" :key="ci" class="flex flex-col gap-1">
+          <div
+            v-for="(column, ci) in columns"
+            :key="ci"
+            class="flex flex-col gap-1"
+            :style="monthStarts.has(ci) ? { marginLeft: `${MONTH_GAP}px` } : undefined"
+          >
             <button
               v-for="cell in column"
               :key="cell.date"

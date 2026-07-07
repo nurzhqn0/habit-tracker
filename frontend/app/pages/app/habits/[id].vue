@@ -53,8 +53,8 @@ async function loadBars() {
   });
 }
 
-async function loadAll() {
-  loading.value = true;
+async function loadAll(silent = false) {
+  if (!silent) loading.value = true;
   try {
     habit.value = await apiFetch<Habit>(`/habits/${habitId}`);
     [overview.value, heatmap.value, weekdays.value, frequencyMonths.value, streaks.value, notes.value] =
@@ -96,7 +96,7 @@ async function onPickDay(date: string) {
   }
   try {
     await apiFetch(`/habits/${habitId}/entries/${date}/toggle`, { method: "POST" });
-    await loadAll();
+    await loadAll(true);
   } catch {
     toast.add({ title: "Could not save entry", color: "error" });
   }
@@ -112,7 +112,7 @@ async function saveValue() {
       method: "PUT",
       body: { value: Math.round(parsed * 1000) },
     });
-    await loadAll();
+    await loadAll(true);
   } catch {
     toast.add({ title: "Could not save entry", color: "error" });
   }

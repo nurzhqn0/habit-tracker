@@ -23,7 +23,7 @@ http {
     add_header X-Frame-Options DENY always;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org https://oauth.telegram.org; frame-src https://oauth.telegram.org; img-src 'self' data: https://t.me https://*.telegram.org https://*.userapi.com https://*.cdn-telegram.org; style-src 'self' 'unsafe-inline'; connect-src 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org https://oauth.telegram.org; frame-src https://oauth.telegram.org; img-src 'self' data: https://t.me https://*.telegram.org https://*.userapi.com https://*.cdn-telegram.org; style-src 'self' 'unsafe-inline'; connect-src 'self' https://oauth.telegram.org" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     upstream frontend {

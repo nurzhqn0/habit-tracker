@@ -174,14 +174,15 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/habitflow.sh
 ## 7. Register the site with the bot
 
 In the [@BotFather](https://t.me/BotFather) mini app: **Bot Settings → Web Login →
-Allowed URLs** — add your site origin:
+Allowed URLs** — add your site origin **and** the login callback URL:
 
 ```
 https://habitflow.example.com
+https://habitflow.example.com/auth/callback
 ```
 
-Make sure `.env` has the matching `TG_CLIENT_ID` (shown on the same Web Login page),
-then recreate the affected services if you just added it:
+Make sure `.env` has the matching `TG_CLIENT_ID` and `TG_CLIENT_SECRET` (both shown
+on the same Web Login page), then recreate the affected services if you just added them:
 
 ```bash
 docker compose up -d --force-recreate api frontend
@@ -189,6 +190,9 @@ docker compose up -d --force-recreate api frontend
 
 Now the **Sign in with Telegram** button works on the landing page (popup-based
 OIDC flow; the backend verifies the returned id_token against Telegram's JWKS).
+Browsers that block popups — e.g. links opened inside Telegram's in-app browser —
+automatically fall back to a full-page redirect (authorization code + PKCE) flow,
+which needs the callback URL and `TG_CLIENT_SECRET` above.
 After logging in, open **Settings → Connect bot** and press **Start** in the chat —
 reminders and room notifications are delivered from then on.
 

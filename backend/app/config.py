@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     bot_token: str = ""
     bot_username: str = ""
     tg_client_id: str = ""  # BotFather -> Bot Settings -> Web Login -> Client ID
+    tg_client_secret: str = ""  # Same page -> Client Secret (needed for the redirect code flow)
 
     frontend_origin: str = "http://localhost:3000"
     test_mode: bool = False

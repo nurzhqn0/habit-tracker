@@ -27,7 +27,34 @@ async function onAuth(data: { id_token?: string; error?: string }) {
   }
 }
 
-function openLogin() {
+function base64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+// Full-page authorization-code flow (PKCE) for browsers that block popups,
+// e.g. Telegram's in-app Safari sheet. Completed by /auth/callback.
+async function startRedirectLogin() {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const state = base64url(crypto.getRandomValues(new Uint8Array(16)));
+  const target = typeof route.query.redirect === "string" ? route.query.redirect : "";
+  sessionStorage.setItem("hf_tg_oidc", JSON.stringify({ verifier, state, target }));
+  const params = new URLSearchParams({
+    client_id: String(tgClientId),
+    redirect_uri: `${location.origin}/auth/callback`,
+    response_type: "code",
+    scope: "openid profile telegram:bot_access",
+    state,
+    code_challenge: base64url(new Uint8Array(digest)),
+    code_challenge_method: "S256",
+  });
+  location.href = `https://oauth.telegram.org/auth?${params.toString()}`;
+}
+
+async function openLogin() {
   const login = (window as any).Telegram?.Login;
   if (!login) {
     toast.add({
@@ -37,7 +64,21 @@ function openLogin() {
     });
     return;
   }
-  login.open();
+  // In-app webviews return null from window.open and the widget then silently
+  // does nothing. Watch the call so we can fall back to the redirect flow.
+  // (Telegram's own browser signs in natively without window.open — untouched.)
+  const originalOpen = window.open;
+  let popup: Window | null | undefined;
+  window.open = function (...args: Parameters<typeof window.open>) {
+    popup = originalOpen.apply(window, args);
+    return popup;
+  };
+  try {
+    login.open();
+  } finally {
+    window.open = originalOpen;
+  }
+  if (popup === null) await startRedirectLogin();
 }
 
 async function devLogin() {

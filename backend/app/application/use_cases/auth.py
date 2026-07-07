@@ -13,7 +13,7 @@ from app.infrastructure.security.jwt import (
     generate_refresh_token,
     hash_refresh_token,
 )
-from app.infrastructure.telegram.oidc_verifier import verify_id_token
+from app.infrastructure.telegram.oidc_verifier import exchange_code, verify_id_token
 
 
 @dataclass
@@ -47,6 +47,18 @@ async def telegram_login(session: AsyncSession, id_token: str, settings: Setting
     result = await _issue_tokens(session, user, settings)
     await session.commit()
     return result
+
+
+async def telegram_code_login(
+    session: AsyncSession, code: str, code_verifier: str, redirect_uri: str, settings: Settings
+) -> AuthResult:
+    """Redirect (authorization code + PKCE) flow — used where popups are blocked."""
+    id_token = await exchange_code(
+        code, code_verifier, redirect_uri, settings.tg_client_id, settings.tg_client_secret
+    )
+    if id_token is None:
+        raise ForbiddenError("Invalid Telegram authentication data")
+    return await telegram_login(session, id_token, settings)
 
 
 async def refresh_session(session: AsyncSession, refresh_token: str, settings: Settings) -> AuthResult:

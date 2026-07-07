@@ -23,6 +23,7 @@ services:
       BOT_TOKEN: ${BOT_TOKEN:-}
       BOT_USERNAME: ${BOT_USERNAME:-}
       TG_CLIENT_ID: ${TG_CLIENT_ID:-}
+      TG_CLIENT_SECRET: ${TG_CLIENT_SECRET:-}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
     volumes:
       - sqlite-data:/srv/app/data
