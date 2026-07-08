@@ -75,7 +75,6 @@ const sortItems = computed<DropdownMenuItem[]>(() =>
 );
 
 async function onToggle(item: HabitOverviewItem, date: string) {
-  if (item.habit.archived) return;
   try {
     await store.toggle(item.habit.id, date);
   } catch {
@@ -107,11 +106,6 @@ function rowMenu(item: HabitOverviewItem): DropdownMenuItem[][] {
     [
       { label: "Details", icon: "i-lucide-chart-line", to: `/app/habits/${habit.id}` },
       { label: "Edit", icon: "i-lucide-pencil", onSelect: () => openEdit(habit) },
-      {
-        label: habit.archived ? "Unarchive" : "Archive",
-        icon: habit.archived ? "i-lucide-archive-restore" : "i-lucide-archive",
-        onSelect: () => store.setArchived(habit.id, !habit.archived),
-      },
     ],
     [
       {
@@ -145,15 +139,6 @@ async function onDragEnd() {
         </template>
         <template #right>
           <USelect v-model="period" :items="periodItems" size="sm" class="w-24" aria-label="Period" />
-          <UTooltip text="Include archived habits (shown dimmed)">
-            <USwitch
-              v-model="store.showArchived"
-              label="Show archived"
-              size="sm"
-              :ui="{ label: 'hidden sm:block' }"
-              @change="load"
-            />
-          </UTooltip>
           <ExportMenu path="/export/report/xlsx" filename-prefix="habits-report" />
           <UDropdownMenu :items="sortItems">
             <UButton icon="i-lucide-arrow-up-down" color="neutral" variant="ghost" aria-label="Sort" />
@@ -210,7 +195,6 @@ async function onDragEnd() {
               <div
                 data-testid="habit-row"
                 class="flex items-center gap-2 border-b border-default py-1"
-                :class="item.habit.archived ? 'opacity-50' : ''"
               >
                 <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
                   <UIcon

@@ -135,7 +135,6 @@ watch(period, () => {
             :key="item.habit.id"
             data-testid="member-habit-row"
             class="flex items-center gap-2 border-b border-default py-1"
-            :class="item.habit.archived ? 'opacity-50' : ''"
           >
             <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
               <NuxtLink

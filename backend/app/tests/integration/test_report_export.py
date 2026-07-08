@@ -67,7 +67,7 @@ async def test_personal_report_defaults_to_week(client):
 async def test_personal_report_range_and_validation(client):
     headers = bearer(await login(client, 6001))
     habit, _ = await seed_personal(client, headers)
-    await client.post(f"/habits/{habit['id']}/archive", headers=headers)
+    await client.delete(f"/habits/{habit['id']}", headers=headers)
 
     response = await client.get(
         "/export/report/xlsx",
@@ -76,7 +76,7 @@ async def test_personal_report_range_and_validation(client):
     )
     rows = sheet_rows(workbook_from(response)["Daily"])
     assert len(rows[0]) == 5  # Habit + 3 dates + Total
-    assert all(r[0] != "Meditate" for r in rows)  # archived habit excluded
+    assert all(r[0] != "Meditate" for r in rows)  # deleted habit excluded
 
     bad = await client.get(
         "/export/report/xlsx",
@@ -93,9 +93,24 @@ async def test_personal_report_range_and_validation(client):
     assert too_long.status_code == 422
 
 
+async def backdate_joins(client, room_id, days=30):
+    """Room stats clamp history to joined_at; pretend everyone joined earlier."""
+    from sqlalchemy import update
+
+    from app.infrastructure.db.tables import RoomMemberRow
+
+    joined = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+    async with client.session_factory() as session:
+        await session.execute(
+            update(RoomMemberRow).where(RoomMemberRow.room_id == room_id).values(joined_at=joined)
+        )
+        await session.commit()
+
+
 async def seed_room(client, owner, member):
     room = await make_room(client, owner)
     await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+    await backdate_joins(client, room["id"])
     room_habit = (
         await client.post(f"/rooms/{room['id']}/habits", json={"name": "Pushups"}, headers=owner)
     ).json()

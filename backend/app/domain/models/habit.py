@@ -25,7 +25,6 @@ class Habit:
     type: HabitType = HabitType.YES_NO
     color: int = 8
     position: int = 0
-    archived: bool = False
     frequency: Frequency = field(default_factory=lambda: DAILY)
     reminder_hour: int | None = None
     reminder_min: int | None = None

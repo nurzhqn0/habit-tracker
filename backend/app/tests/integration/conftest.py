@@ -71,6 +71,7 @@ async def client(monkeypatch) -> AsyncIterator[AsyncClient]:
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test/api/v1") as c:
+        c.session_factory = app.state.session_factory  # direct DB access for test seeding
         yield c
     await engine.dispose()
     get_settings.cache_clear()

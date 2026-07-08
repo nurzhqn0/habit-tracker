@@ -4,6 +4,8 @@ export interface Room {
   description: string;
   owner_id: number;
   invite_code: string;
+  show_leaderboard: boolean;
+  show_members: boolean;
   created_at: string;
 }
 
@@ -29,7 +31,6 @@ export interface RoomHabit {
   target_type: 0 | 1;
   target_value: number;
   unit: string;
-  archived: boolean;
 }
 
 export interface RoomHabitWithLink {

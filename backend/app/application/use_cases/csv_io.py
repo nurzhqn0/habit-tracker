@@ -87,7 +87,7 @@ def _habits_csv(rows) -> str:
             row.unit if row.type == 1 else "",
             ("AT_LEAST" if row.target_type == 0 else "AT_MOST") if row.type == 1 else "",
             f"{row.target_value:.1f}" if row.type == 1 else "",
-            "1" if row.archived else "0",
+            "0",  # Archived? kept for Loop-format compatibility; feature removed
         ])
     return _csv(table)
 
@@ -238,7 +238,7 @@ async def export_xlsx(session: AsyncSession, user_id: int, habit_id: int | None 
             row.unit if row.type == 1 else "",
             ("AT_LEAST" if row.target_type == 0 else "AT_MOST") if row.type == 1 else "",
             row.target_value if row.type == 1 else "",
-            "yes" if row.archived else "no",
+            "no",  # Archived? kept for Loop-format compatibility; feature removed
         ])
 
     prepared = []
@@ -327,7 +327,7 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
     updated_entries = 0
 
     for row in rows[1:]:
-        if len(row) < (7 if loop_format else 12) or not row[1].strip():
+        if len(row) < (7 if loop_format else 11) or not row[1].strip():
             continue
         position, name = row[0], row[1].strip()
         if loop_format:
@@ -342,7 +342,6 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
                 unit="",
                 target_type=0,
                 target_value=0.0,
-                archived=False,
             )
         else:
             habit_type = 1 if row[2].strip() == "NUMERICAL" else 0
@@ -356,7 +355,6 @@ async def import_zip(session: AsyncSession, user_id: int, data: bytes) -> dict:
                 unit=row[8],
                 target_type=1 if row[9].strip() == "AT_MOST" else 0,
                 target_value=float(row[10] or 0),
-                archived=row[11].strip() in ("1", "yes", "true"),
             )
 
         habit = existing.get(name)

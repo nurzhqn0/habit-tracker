@@ -23,10 +23,10 @@ async def test_habit_crud(client):
     patched = await client.patch(f"/habits/{habit['id']}", json={"name": "Meditate AM"}, headers=headers)
     assert patched.json()["name"] == "Meditate AM"
 
-    archived = await client.post(f"/habits/{habit['id']}/archive", headers=headers)
-    assert archived.json()["archived"] is True
-    active = await client.get("/habits", params={"archived": False}, headers=headers)
-    assert active.json() == []
+    # Archive feature removed.
+    assert (
+        await client.post(f"/habits/{habit['id']}/archive", headers=headers)
+    ).status_code in (404, 405)
 
     deleted = await client.delete(f"/habits/{habit['id']}", headers=headers)
     assert deleted.status_code == 204

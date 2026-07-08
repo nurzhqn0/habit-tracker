@@ -24,7 +24,6 @@ def to_domain(row: HabitRow) -> Habit:
         type=HabitType(row.type),
         color=row.color,
         position=row.position,
-        archived=row.archived,
         frequency=Frequency(row.freq_num, row.freq_den),
         reminder_hour=row.reminder_hour,
         reminder_min=row.reminder_min,

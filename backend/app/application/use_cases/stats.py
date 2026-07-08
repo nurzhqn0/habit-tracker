@@ -28,10 +28,14 @@ class StatsContext:
     first_weekday: int
 
 
-async def _context(session: AsyncSession, user_id: int, habit_id: int) -> StatsContext:
+async def _context(
+    session: AsyncSession, user_id: int, habit_id: int, since: Date | None = None
+) -> StatsContext:
     habit_row = await HabitRepo(session).get_owned(habit_id, user_id)
     habit = habit_math.to_domain(habit_row)
     entry_rows = await EntryRepo(session).all_for_habit(habit_id)
+    if since is not None:
+        entry_rows = [r for r in entry_rows if r.date >= since]
     prefs = await UserRepo(session).get_or_create_preferences(user_id)
     return StatsContext(
         habit=habit,
@@ -41,8 +45,10 @@ async def _context(session: AsyncSession, user_id: int, habit_id: int) -> StatsC
     )
 
 
-async def overview(session: AsyncSession, user_id: int, habit_id: int) -> dict:
-    ctx = await _context(session, user_id, habit_id)
+async def overview(
+    session: AsyncSession, user_id: int, habit_id: int, since: Date | None = None
+) -> dict:
+    ctx = await _context(session, user_id, habit_id, since)
     scores = habit_math.scores_for(ctx.habit, ctx.computed, ctx.today)
     by_date = {s.date: s.value for s in scores}
     today_score = by_date.get(ctx.today, scores[-1].value if scores else 0.0)
@@ -71,9 +77,14 @@ _BUCKETS = {
 
 
 async def scores_series(
-    session: AsyncSession, user_id: int, habit_id: int, bucket: str, from_date: Date | None
+    session: AsyncSession,
+    user_id: int,
+    habit_id: int,
+    bucket: str,
+    from_date: Date | None,
+    since: Date | None = None,
 ) -> list[dict]:
-    ctx = await _context(session, user_id, habit_id)
+    ctx = await _context(session, user_id, habit_id, since)
     scores = habit_math.scores_for(ctx.habit, ctx.computed, ctx.today)
     if from_date:
         scores = [s for s in scores if s.date >= from_date]
@@ -91,8 +102,10 @@ async def scores_series(
     ]
 
 
-async def history(session: AsyncSession, user_id: int, habit_id: int, year: int | None) -> dict:
-    ctx = await _context(session, user_id, habit_id)
+async def history(
+    session: AsyncSession, user_id: int, habit_id: int, year: int | None, since: Date | None = None
+) -> dict:
+    ctx = await _context(session, user_id, habit_id, since)
     entries = ctx.computed
     if year:
         entries = {d: e for d, e in entries.items() if d.year == year}
@@ -106,16 +119,20 @@ async def history(session: AsyncSession, user_id: int, habit_id: int, year: int 
     }
 
 
-async def bar(session: AsyncSession, user_id: int, habit_id: int, bucket: str) -> list[dict]:
-    ctx = await _context(session, user_id, habit_id)
+async def bar(
+    session: AsyncSession, user_id: int, habit_id: int, bucket: str, since: Date | None = None
+) -> list[dict]:
+    ctx = await _context(session, user_id, habit_id, since)
     entries = sorted(ctx.computed.values(), key=lambda e: e.date, reverse=True)
     sums = grouped_sum(entries, _BUCKETS[bucket], ctx.habit.is_numerical, ctx.first_weekday)
     return [{"date": e.date, "value": e.value} for e in reversed(sums)]
 
 
-async def weekdays(session: AsyncSession, user_id: int, habit_id: int) -> list[dict]:
+async def weekdays(
+    session: AsyncSession, user_id: int, habit_id: int, since: Date | None = None
+) -> list[dict]:
     """Totals per weekday Mon..Sun across all history."""
-    ctx = await _context(session, user_id, habit_id)
+    ctx = await _context(session, user_id, habit_id, since)
     totals = [0] * 7
     for e in ctx.computed.values():
         if ctx.habit.is_numerical:
@@ -126,9 +143,11 @@ async def weekdays(session: AsyncSession, user_id: int, habit_id: int) -> list[d
     return [{"weekday": i, "value": totals[i]} for i in range(7)]
 
 
-async def frequency(session: AsyncSession, user_id: int, habit_id: int) -> list[dict]:
+async def frequency(
+    session: AsyncSession, user_id: int, habit_id: int, since: Date | None = None
+) -> list[dict]:
     """Per-month weekday totals for the frequency dot chart. Weekdays Sunday-first."""
-    ctx = await _context(session, user_id, habit_id)
+    ctx = await _context(session, user_id, habit_id, since)
     by_month = compute_weekday_frequency(list(ctx.computed.values()), ctx.habit.is_numerical)
     return [
         # uhabits layout is Saturday=0, Sunday=1 .. Friday=6; rotate to Sunday-first.
@@ -137,8 +156,10 @@ async def frequency(session: AsyncSession, user_id: int, habit_id: int) -> list[
     ]
 
 
-async def streaks(session: AsyncSession, user_id: int, habit_id: int, limit: int) -> list[dict]:
-    ctx = await _context(session, user_id, habit_id)
+async def streaks(
+    session: AsyncSession, user_id: int, habit_id: int, limit: int, since: Date | None = None
+) -> list[dict]:
+    ctx = await _context(session, user_id, habit_id, since)
     all_streaks = habit_math.streaks_for(ctx.habit, ctx.computed, ctx.today)
     return [
         {"start": s.start, "end": s.end, "length": s.length}
@@ -146,9 +167,11 @@ async def streaks(session: AsyncSession, user_id: int, habit_id: int, limit: int
     ]
 
 
-async def target(session: AsyncSession, user_id: int, habit_id: int) -> list[dict]:
+async def target(
+    session: AsyncSession, user_id: int, habit_id: int, since: Date | None = None
+) -> list[dict]:
     """Numerical target card: actual vs adjusted target for week/month/quarter/year."""
-    ctx = await _context(session, user_id, habit_id)
+    ctx = await _context(session, user_id, habit_id, since)
     habit = ctx.habit
     entries = sorted(ctx.computed.values(), key=lambda e: e.date, reverse=True)
     daily_target = habit.target_value / habit.frequency.denominator * habit.frequency.numerator
@@ -177,8 +200,10 @@ async def target(session: AsyncSession, user_id: int, habit_id: int) -> list[dic
     return result
 
 
-async def notes(session: AsyncSession, user_id: int, habit_id: int, limit: int = 50) -> list[dict]:
-    ctx = await _context(session, user_id, habit_id)
+async def notes(
+    session: AsyncSession, user_id: int, habit_id: int, limit: int = 50, since: Date | None = None
+) -> list[dict]:
+    ctx = await _context(session, user_id, habit_id, since)
     with_notes = sorted(
         (e for e in ctx.computed.values() if e.notes), key=lambda e: e.date, reverse=True
     )

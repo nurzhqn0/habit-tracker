@@ -41,7 +41,6 @@ async def find_due_reminders(session: AsyncSession, now_utc: datetime) -> list[D
         .join(UserRow, HabitRow.user_id == UserRow.id)
         .join(UserPreferencesRow, UserPreferencesRow.user_id == UserRow.id)
         .where(
-            HabitRow.archived.is_(False),
             HabitRow.reminder_hour.is_not(None),
             UserRow.bot_linked.is_(True),
             UserPreferencesRow.reminders_enabled.is_(True),

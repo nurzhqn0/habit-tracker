@@ -12,6 +12,8 @@ class RoomCreate(BaseModel):
 class RoomPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=1000)
+    show_leaderboard: bool | None = None
+    show_members: bool | None = None
 
 
 class RoomOut(BaseModel):
@@ -22,6 +24,8 @@ class RoomOut(BaseModel):
     description: str
     owner_id: int
     invite_code: str
+    show_leaderboard: bool
+    show_members: bool
     created_at: datetime
 
 
@@ -77,7 +81,6 @@ class RoomHabitPatch(BaseModel):
     target_type: int | None = Field(default=None, ge=0, le=1)
     target_value: float | None = Field(default=None, ge=0)
     unit: str | None = Field(default=None, max_length=50)
-    archived: bool | None = None
 
 
 class RoomHabitOut(BaseModel):
@@ -95,7 +98,6 @@ class RoomHabitOut(BaseModel):
     target_type: int
     target_value: float
     unit: str
-    archived: bool
 
 
 class RoomHabitWithLinkOut(BaseModel):

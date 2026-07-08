@@ -7,11 +7,10 @@ export type SortMode = "manual" | "name" | "color" | "score" | "status";
 export const useHabitsStore = defineStore("habits", {
   state: () => ({
     items: [] as HabitOverviewItem[],
-    loading: false,
+    loading: true,
     from: "",
     to: "",
     sort: "manual" as SortMode,
-    showArchived: false,
   }),
   actions: {
     async loadOverview(from: string, to: string) {
@@ -20,7 +19,7 @@ export const useHabitsStore = defineStore("habits", {
       this.loading = this.items.length === 0;
       try {
         this.items = await apiFetch<HabitOverviewItem[]>("/habits/overview", {
-          query: { from, to, sort: this.sort, include_archived: this.showArchived },
+          query: { from, to, sort: this.sort },
         });
       } finally {
         this.loading = false;
@@ -87,11 +86,6 @@ export const useHabitsStore = defineStore("habits", {
     async deleteHabit(habitId: number) {
       await apiFetch(`/habits/${habitId}`, { method: "DELETE" });
       this.items = this.items.filter((i) => i.habit.id !== habitId);
-    },
-
-    async setArchived(habitId: number, archived: boolean) {
-      await apiFetch(`/habits/${habitId}/${archived ? "archive" : "unarchive"}`, { method: "POST" });
-      await this.reload();
     },
 
     async reorder(orderedIds: number[]) {

@@ -29,7 +29,12 @@ const editOpen = ref(false);
 
 const color = computed(() => paletteColor(habit.value?.color ?? 8));
 
-useHead({ title: computed(() => habit.value?.name ?? "Habit") });
+// The habits store usually already holds the habit when navigating from the
+// grid — use its name until the fetch resolves to avoid a "Habit" title flash.
+const cachedName = store.items.find((i) => i.habit.id === habitId)?.habit.name ?? null;
+const title = computed(() => habit.value?.name ?? cachedName ?? "Habit");
+
+useHead({ title });
 
 const frequencyLabel = computed(() => {
   if (!habit.value) return "";
@@ -133,7 +138,7 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 <template>
   <UDashboardPanel id="habit-detail">
     <template #header>
-      <UDashboardNavbar :title="habit?.name ?? 'Habit'" :toggle="false">
+      <UDashboardNavbar :title="title" :toggle="false">
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app" aria-label="Back" />
         </template>

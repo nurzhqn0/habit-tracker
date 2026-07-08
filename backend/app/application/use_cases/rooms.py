@@ -53,13 +53,16 @@ async def create_room(session: AsyncSession, user_id: int, name: str, descriptio
 
 
 async def update_room(session: AsyncSession, user_id: int, room_id: int, fields: dict) -> RoomRow:
-    room = await _require_owner(session, room_id, user_id)
+    room = await _require_admin(session, room_id, user_id)
     if "name" in fields and fields["name"] is not None:
         if not str(fields["name"]).strip():
             raise ValidationError("Room name must not be empty")
         room.name = str(fields["name"]).strip()
     if "description" in fields and fields["description"] is not None:
         room.description = fields["description"]
+    for flag in ("show_leaderboard", "show_members"):
+        if fields.get(flag) is not None:
+            setattr(room, flag, fields[flag])
     await session.commit()
     return room
 
@@ -144,7 +147,7 @@ async def remove_member(session: AsyncSession, user_id: int, room_id: int, targe
         raise NotFoundError("Member not found")
 
     # Unlink the member's habits from this room.
-    for room_habit in await repo.room_habits(room_id, include_archived=True):
+    for room_habit in await repo.room_habits(room_id):
         link = await repo.link_for_user(room_habit.id, target_user_id)
         if link is not None:
             await session.delete(link)
@@ -206,7 +209,7 @@ async def update_room_habit(
     await _require_admin(session, room_id, user_id)
     habit = await RoomRepo(session).get_room_habit(room_id, room_habit_id)
     for key, value in fields.items():
-        if key in ROOM_HABIT_FIELDS or key == "archived":
+        if key in ROOM_HABIT_FIELDS:
             setattr(habit, key, value)
     await session.commit()
     return habit
@@ -294,10 +297,15 @@ async def leaderboard(
     period: str = "week",
     window: tuple[Date, Date] | None = None,
 ) -> list[LeaderboardRow]:
-    await _require_member(session, room_id, user_id)
+    room = await _require_member(session, room_id, user_id)
     repo = RoomRepo(session)
+    if not room.show_leaderboard and room.owner_id != user_id:
+        caller = await repo.membership(room_id, user_id)
+        if caller.role not in ("owner", "admin"):
+            raise ForbiddenError("The leaderboard is hidden in this room")
     members = await repo.members_with_users(room_id)
     room_habits = await repo.room_habits(room_id)
+    room_habit_by_id = {rh.id: rh for rh in room_habits}
     links = await repo.links_for_room_habits([rh.id for rh in room_habits])
     links_by_user: dict[int, list[HabitLinkRow]] = {}
     for link in links:
@@ -324,6 +332,7 @@ async def leaderboard(
         best_streak = 0
         completions = 0
         user_links = links_by_user.get(user.id, [])
+        joined = membership.joined_at.date()
 
         for link in user_links:
             try:
@@ -331,14 +340,15 @@ async def leaderboard(
             except NotFoundError:
                 continue
             habit = habit_math.to_domain(habit_row)
-            entry_rows = await entry_repo.all_for_habit(habit_row.id)
+            entry_rows = [r for r in await entry_repo.all_for_habit(habit_row.id) if r.date >= joined]
             computed = habit_math.computed_entries_for(habit, entry_rows)
+            room_habit = room_habit_by_id[link.room_habit_id]
             best_score = max(best_score, habit_math.score_on(habit, computed, today))
             best_streak = max(best_streak, habit_math.current_streak(habit, computed, today))
             completions += sum(
                 1
                 for d, e in computed.items()
-                if since <= d <= until and _is_success(habit_row, e.value)
+                if since <= d <= until and _is_success(room_habit, e.value)
             )
 
         rows.append(
@@ -384,28 +394,38 @@ async def member_overview(
 ) -> list[habits_uc.HabitOverviewItem]:
     await _require_admin(session, room_id, caller_id)
     repo = RoomRepo(session)
-    if await repo.membership(room_id, member_id) is None:
+    membership = await repo.membership(room_id, member_id)
+    if membership is None:
         raise NotFoundError("Member not found")
     room_habits = await repo.room_habits(room_id)
     links = await repo.links_for_room_habits([rh.id for rh in room_habits])
     habit_ids = [link.habit_id for link in links if link.user_id == member_id]
     return await habits_uc.get_overview(
-        session, member_id, from_date, to_date, include_archived=True, habit_ids=habit_ids
+        session, member_id, from_date, to_date,
+        habit_ids=habit_ids, since=membership.joined_at.date(),
     )
 
 
 async def record_entry_activity(
-    session: AsyncSession, user_id: int, habit_row: HabitRow, entry_date: Date, value: int
+    session: AsyncSession,
+    user_id: int,
+    habit_row: HabitRow,
+    entry_date: Date,
+    value: int,
+    previous_value: int,
 ) -> None:
-    """Called after an entry change on a linked habit: logs a completion event."""
+    """Called after an entry change on a linked habit: logs a completion event.
+
+    Success is judged against the ROOM habit's target, not the member's personal one.
+    """
     repo = RoomRepo(session)
     link = await repo.link_for_habit(habit_row.id)
     if link is None or link.user_id != user_id:
         return
-    if not _is_success(habit_row, value) or value == SKIP:
-        return
     room_habit = await session.get(RoomHabitRow, link.room_habit_id)
     if room_habit is None:
+        return
+    if value == SKIP or not _is_success(room_habit, value) or _is_success(room_habit, previous_value):
         return
     await repo.add_event(
         room_habit.room_id, user_id, "entry_completed",

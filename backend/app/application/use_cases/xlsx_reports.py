@@ -114,7 +114,7 @@ async def export_personal_xlsx(
 ) -> tuple[bytes, Date, Date]:
     prefs = await UserRepo(session).get_or_create_preferences(user_id)
     frm, to = _resolve_window(from_date, to_date, habit_math.user_today(prefs))
-    rows = await HabitRepo(session).list_for_user(user_id, archived=False)
+    rows = await HabitRepo(session).list_for_user(user_id)
     entries = await EntryRepo(session).all_for_habits([r.id for r in rows])
 
     records = []
@@ -144,7 +144,7 @@ async def export_room_xlsx(
     members = await repo.members_with_users(room_id)
     room_habits = await repo.room_habits(room_id)
     links = await repo.links_for_room_habits([rh.id for rh in room_habits])
-    habit_names = {rh.id: rh.name for rh in room_habits}
+    room_habit_by_id = {rh.id: rh for rh in room_habits}
     links_by_user: dict[int, list] = {}
     for link in links:
         links_by_user.setdefault(link.user_id, []).append(link)
@@ -154,9 +154,10 @@ async def export_room_xlsx(
 
     records = []
     analytics = []
-    for _membership, user in members:
+    for membership, user in members:
         member_prefs = await user_repo.get_or_create_preferences(user.id)
         member_today = habit_math.user_today(member_prefs)
+        joined = membership.joined_at.date()
         label = f"{user.first_name} (@{user.username})" if user.username else user.first_name
         for link in links_by_user.get(user.id, []):
             try:
@@ -164,21 +165,22 @@ async def export_room_xlsx(
             except NotFoundError:
                 continue
             habit = habit_math.to_domain(habit_row)
-            entry_rows = await entry_repo.all_for_habit(habit_row.id)
+            entry_rows = [r for r in await entry_repo.all_for_habit(habit_row.id) if r.date >= joined]
             computed = habit_math.computed_entries_for(habit, entry_rows)
-            name = habit_names.get(link.room_habit_id, habit_row.name)
-            records.append(([label, name], habit_row, computed))
+            # Room views judge success against the ROOM habit's target, not the member's.
+            room_habit = room_habit_by_id[link.room_habit_id]
+            records.append(([label, room_habit.name], room_habit, computed))
             completions = sum(
-                1 for d, e in computed.items() if frm <= d <= to and _is_success(habit_row, e.value)
+                1 for d, e in computed.items() if frm <= d <= to and _is_success(room_habit, e.value)
             )
             analytics.append([
                 label,
-                name,
-                _format_target(habit_row),
+                room_habit.name,
+                _format_target(room_habit),
                 habit_math.score_on(habit, computed, member_today),
                 habit_math.current_streak(habit, computed, member_today),
                 completions,
-                _success_rate(habit_row, computed, frm, to, member_today, completions),
+                _success_rate(room_habit, computed, frm, to, member_today, completions),
             ])
 
     workbook = Workbook()

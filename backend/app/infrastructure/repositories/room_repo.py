@@ -66,10 +66,8 @@ class RoomRepo:
         )
         return [(m, u) for m, u in (await self.session.execute(query)).all()]
 
-    async def room_habits(self, room_id: int, include_archived: bool = False) -> list[RoomHabitRow]:
+    async def room_habits(self, room_id: int) -> list[RoomHabitRow]:
         query = select(RoomHabitRow).where(RoomHabitRow.room_id == room_id)
-        if not include_archived:
-            query = query.where(RoomHabitRow.archived.is_(False))
         return list((await self.session.execute(query)).scalars().all())
 
     async def get_room_habit(self, room_id: int, room_habit_id: int) -> RoomHabitRow:

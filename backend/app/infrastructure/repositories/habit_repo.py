@@ -12,11 +12,12 @@ class HabitRepo:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def list_for_user(self, user_id: int, archived: bool | None = None) -> list[HabitRow]:
-        query = select(HabitRow).where(HabitRow.user_id == user_id)
-        if archived is not None:
-            query = query.where(HabitRow.archived.is_(archived))
-        query = query.order_by(HabitRow.position, HabitRow.id)
+    async def list_for_user(self, user_id: int) -> list[HabitRow]:
+        query = (
+            select(HabitRow)
+            .where(HabitRow.user_id == user_id)
+            .order_by(HabitRow.position, HabitRow.id)
+        )
         return list((await self.session.execute(query)).scalars())
 
     async def get_owned(self, habit_id: int, user_id: int) -> HabitRow:

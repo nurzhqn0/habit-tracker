@@ -59,7 +59,7 @@ class RefreshTokenRow(Base):
 
 class HabitRow(Base):
     __tablename__ = "habits"
-    __table_args__ = (Index("ix_habits_user_archived_position", "user_id", "archived", "position"),)
+    __table_args__ = (Index("ix_habits_user_position", "user_id", "position"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -70,7 +70,6 @@ class HabitRow(Base):
     type: Mapped[int] = mapped_column(Integer, default=0)  # 0=YES_NO, 1=NUMERICAL
     color: Mapped[int] = mapped_column(Integer, default=8)  # palette index 0..19
     position: Mapped[int] = mapped_column(Integer, default=0)
-    archived: Mapped[bool] = mapped_column(Boolean, default=False)
     freq_num: Mapped[int] = mapped_column(Integer, default=1)
     freq_den: Mapped[int] = mapped_column(Integer, default=1)
     reminder_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)  # null = no reminder
@@ -106,6 +105,8 @@ class RoomRow(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     invite_code: Mapped[str] = mapped_column(Text, unique=True)
+    show_leaderboard: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    show_members: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -135,7 +136,6 @@ class RoomHabitRow(Base):
     target_type: Mapped[int] = mapped_column(Integer, default=0)
     target_value: Mapped[float] = mapped_column(Float, default=0.0)
     unit: Mapped[str] = mapped_column(Text, default="")
-    archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

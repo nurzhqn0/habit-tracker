@@ -4,7 +4,7 @@ from datetime import date as Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import habit_math
-from app.application.use_cases.rooms import _is_success, record_entry_activity
+from app.application.use_cases.rooms import record_entry_activity
 from app.domain.errors import ValidationError
 from app.domain.models.entry import UNKNOWN, next_toggle_value
 from app.infrastructure.repositories.habit_repo import EntryRepo, HabitRepo
@@ -60,8 +60,7 @@ async def upsert_entry(
         await repo.delete(habit_id, date)
     else:
         await repo.upsert(habit_id, date, value, notes)
-    if _is_success(habit_row, value) and not _is_success(habit_row, previous_value):
-        await record_entry_activity(session, user_id, habit_row, date, value)
+    await record_entry_activity(session, user_id, habit_row, date, value, previous_value)
     await session.commit()
 
     score, streak, entries = await _refreshed(session, habit_row, user_id)
@@ -87,8 +86,7 @@ async def toggle_entry(session: AsyncSession, user_id: int, habit_id: int, date:
         await repo.delete(habit_id, date)
     else:
         await repo.upsert(habit_id, date, next_value)
-    if _is_success(habit_row, next_value) and not _is_success(habit_row, current):
-        await record_entry_activity(session, user_id, habit_row, date, next_value)
+    await record_entry_activity(session, user_id, habit_row, date, next_value, current)
     await session.commit()
 
     score, streak, entries = await _refreshed(session, habit_row, user_id)

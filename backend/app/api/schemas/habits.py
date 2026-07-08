@@ -45,7 +45,6 @@ class HabitOut(HabitBase):
     id: int
     uuid: str
     position: int
-    archived: bool
     created_at: datetime
 
 

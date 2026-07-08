@@ -13,7 +13,6 @@ export interface Habit {
   type: 0 | 1; // 0=yes/no, 1=numerical
   color: number;
   position: number;
-  archived: boolean;
   freq_num: number;
   freq_den: number;
   reminder_hour: number | null;

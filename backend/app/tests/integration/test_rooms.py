@@ -149,7 +149,10 @@ async def test_leaderboard_and_feed(client):
     assert board[0]["completions"] == 1  # owner leads
     assert board[0]["score"] > board[1]["score"]
 
-    feed = (await client.get(f"/rooms/{room['id']}/feed", headers=member)).json()
+    # Feed is restricted to the owner and admins.
+    assert (await client.get(f"/rooms/{room['id']}/feed", headers=member)).status_code == 403
+
+    feed = (await client.get(f"/rooms/{room['id']}/feed", headers=owner)).json()
     types = [e["type"] for e in feed]
     assert "entry_completed" in types
     assert "member_joined" in types
@@ -159,14 +162,14 @@ async def test_leaderboard_and_feed(client):
 
     # Cursor pagination.
     first_page = (
-        await client.get(f"/rooms/{room['id']}/feed", params={"limit": 2}, headers=member)
+        await client.get(f"/rooms/{room['id']}/feed", params={"limit": 2}, headers=owner)
     ).json()
     assert len(first_page) == 2
     second_page = (
         await client.get(
             f"/rooms/{room['id']}/feed",
             params={"limit": 10, "cursor": first_page[-1]["id"]},
-            headers=member,
+            headers=owner,
         )
     ).json()
     assert all(e["id"] < first_page[-1]["id"] for e in second_page)
@@ -251,10 +254,10 @@ async def test_admin_permissions(client):
     ).status_code == 204
     assert (await client.post(f"/rooms/{room['id']}/invite/rotate", headers=admin)).status_code == 200
 
-    # Admin cannot patch/delete the room or change roles.
-    assert (
-        await client.patch(f"/rooms/{room['id']}", json={"name": "Mine"}, headers=admin)
-    ).status_code == 403
+    # Admin can patch room settings but cannot delete the room or change roles.
+    patched = await client.patch(f"/rooms/{room['id']}", json={"name": "Ours"}, headers=admin)
+    assert patched.status_code == 200
+    assert patched.json()["name"] == "Ours"
     assert (await client.delete(f"/rooms/{room['id']}", headers=admin)).status_code == 403
     assert (
         await client.patch(
@@ -467,3 +470,153 @@ async def test_member_habit_view_cross_room_denied(client):
             headers=owner,
         )
     ).status_code == 404
+
+
+async def test_room_visibility_flags(client):
+    owner = bearer(await login(client, 5060))
+    admin_tokens = await login(client, 5061)
+    admin = bearer(admin_tokens)
+    admin_id = admin_tokens["user"]["id"]
+    member = bearer(await login(client, 5062))
+    room = await make_room(client, owner)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=admin)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+    await client.patch(
+        f"/rooms/{room['id']}/members/{admin_id}", json={"role": "admin"}, headers=owner
+    )
+
+    # Flags default to visible.
+    assert room["show_leaderboard"] is True
+    assert room["show_members"] is True
+    assert (await client.get(f"/rooms/{room['id']}/leaderboard", headers=member)).status_code == 200
+    assert len((await client.get(f"/rooms/{room['id']}/members", headers=member)).json()) == 3
+
+    patched = await client.patch(
+        f"/rooms/{room['id']}",
+        json={"show_leaderboard": False, "show_members": False},
+        headers=owner,
+    )
+    assert patched.status_code == 200
+    assert patched.json()["show_leaderboard"] is False
+    assert patched.json()["show_members"] is False
+
+    # Plain member: leaderboard denied, member list shrinks to their own row.
+    assert (await client.get(f"/rooms/{room['id']}/leaderboard", headers=member)).status_code == 403
+    mine = (await client.get(f"/rooms/{room['id']}/members", headers=member)).json()
+    assert len(mine) == 1
+    assert mine[0]["role"] == "member"
+
+    # Admin and owner keep full access.
+    for viewer in (admin, owner):
+        assert (
+            await client.get(f"/rooms/{room['id']}/leaderboard", headers=viewer)
+        ).status_code == 200
+        assert len((await client.get(f"/rooms/{room['id']}/members", headers=viewer)).json()) == 3
+
+    # Restoring the flags restores member access.
+    await client.patch(
+        f"/rooms/{room['id']}",
+        json={"show_leaderboard": True, "show_members": True},
+        headers=admin,  # admins may edit settings too
+    )
+    assert (await client.get(f"/rooms/{room['id']}/leaderboard", headers=member)).status_code == 200
+    assert len((await client.get(f"/rooms/{room['id']}/members", headers=member)).json()) == 3
+
+
+async def test_room_target_independent_of_personal_target(client):
+    owner = bearer(await login(client, 5070))
+    member = bearer(await login(client, 5071))
+    room = await make_room(client, owner)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+
+    room_habit = (
+        await client.post(
+            f"/rooms/{room['id']}/habits",
+            json={"name": "Read", "type": 1, "target_value": 20, "unit": "pages"},
+            headers=owner,
+        )
+    ).json()
+    habit_id = (
+        await client.post(f"/rooms/{room['id']}/habits/{room_habit['id']}/link", json={}, headers=member)
+    ).json()["habit_id"]
+
+    # Member raises their personal target; the room habit's target stays untouched.
+    patched = await client.patch(
+        f"/habits/{habit_id}", json={"target_value": 40}, headers=member
+    )
+    assert patched.json()["target_value"] == 40
+    room_view = (await client.get(f"/rooms/{room['id']}/habits", headers=member)).json()
+    assert room_view[0]["habit"]["target_value"] == 20
+
+    # 30 pages: enough for the room target (20), not for the personal target (40).
+    await client.put(f"/habits/{habit_id}/entries/{TODAY}", json={"value": 30000}, headers=member)
+
+    board = (await client.get(f"/rooms/{room['id']}/leaderboard", headers=member)).json()
+    member_row = next(r for r in board if r["linked_habits"] == 1 and r["completions"] > 0)
+    assert member_row["completions"] == 1
+
+    feed = (await client.get(f"/rooms/{room['id']}/feed", headers=owner)).json()
+    assert sum(1 for e in feed if e["type"] == "entry_completed") == 1
+
+    # Personally not done: streak stays 0.
+    overview = (
+        await client.get(
+            "/habits/overview",
+            params={"from": str(TODAY - timedelta(days=6)), "to": str(TODAY)},
+            headers=member,
+        )
+    ).json()
+    assert overview[0]["streak"] == 0
+
+
+async def test_member_history_clamped_to_join_date(client):
+    owner = bearer(await login(client, 5080))
+    member_tokens = await login(client, 5081)
+    member = bearer(member_tokens)
+    member_id = member_tokens["user"]["id"]
+
+    # Member records history BEFORE joining the room.
+    habit = (await client.post("/habits", json={"name": "Run"}, headers=member)).json()
+    for offset in (10, 9, 8):
+        d = TODAY - timedelta(days=offset)
+        await client.post(f"/habits/{habit['id']}/entries/{d}/toggle", headers=member)
+
+    room = await make_room(client, owner)
+    await client.post("/rooms/join", json={"code": room["invite_code"]}, headers=member)
+    room_habit = (
+        await client.post(f"/rooms/{room['id']}/habits", json={"name": "Run"}, headers=owner)
+    ).json()
+    await client.post(
+        f"/rooms/{room['id']}/habits/{room_habit['id']}/link",
+        json={"habit_id": habit["id"]},
+        headers=member,
+    )
+    # One post-join completion.
+    await client.post(f"/habits/{habit['id']}/entries/{TODAY}/toggle", headers=member)
+
+    # Leaderboard (all time) counts only post-join entries.
+    board = (
+        await client.get(f"/rooms/{room['id']}/leaderboard", params={"period": "all"}, headers=owner)
+    ).json()
+    member_row = next(r for r in board if r["user_id"] == member_id)
+    assert member_row["completions"] == 1
+
+    base = f"/rooms/{room['id']}/members/{member_id}"
+    window = {"from": str(TODAY - timedelta(days=14)), "to": str(TODAY)}
+    items = (await client.get(f"{base}/overview", params=window, headers=owner)).json()
+    assert items[0]["entries"] == {str(TODAY): 2}
+
+    stats = (
+        await client.get(f"{base}/habits/{habit['id']}/stats/overview", headers=owner)
+    ).json()
+    assert stats["total_count"] == 1
+
+    # The member still sees their own full history on the personal endpoint.
+    own = (
+        await client.get(
+            "/habits/overview",
+            params={"from": str(TODAY - timedelta(days=14)), "to": str(TODAY)},
+            headers=member,
+        )
+    ).json()
+    assert len(own[0]["entries"]) == 4

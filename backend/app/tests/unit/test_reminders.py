@@ -30,7 +30,6 @@ async def seed(
     hour=9,
     minute=0,
     days=127,
-    archived=False,
 ):
     user = UserRow(telegram_id=telegram_id, first_name="U", bot_linked=bot_linked)
     session.add(user)
@@ -38,7 +37,7 @@ async def seed(
     session.add(UserPreferencesRow(user_id=user.id, timezone=timezone, reminders_enabled=reminders_enabled))
     habit = HabitRow(
         user_id=user.id, uuid=f"u{telegram_id}", name="Habit",
-        reminder_hour=hour, reminder_min=minute, reminder_days=days, archived=archived,
+        reminder_hour=hour, reminder_min=minute, reminder_days=days,
     )
     session.add(habit)
     await session.flush()
@@ -79,7 +78,6 @@ async def test_skips_completed_and_gates(session_factory):
         session.add(EntryRow(habit_id=habit.id, date=NOW.date(), value=2))
         await seed(session, telegram_id=2, bot_linked=False)
         await seed(session, telegram_id=3, reminders_enabled=False)
-        await seed(session, telegram_id=4, archived=True)
         await seed(session, telegram_id=5)  # the only eligible one
         await session.commit()
         due = await find_due_reminders(session, NOW)

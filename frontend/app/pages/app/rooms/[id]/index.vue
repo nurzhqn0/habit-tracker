@@ -14,13 +14,6 @@ const auth = useAuthStore();
 const view = useRoomViewStore();
 const roomId = Number(route.params.id);
 
-const tab = computed({
-  get: () => view.activeTabs[roomId] ?? "habits",
-  set: (value: string) => {
-    view.activeTabs[roomId] = value;
-  },
-});
-
 const room = ref<Room | null>(view.viewedRoom?.id === roomId ? view.viewedRoom : null);
 const habits = ref<RoomHabitWithLink[]>([]);
 const members = ref<RoomMember[]>([]);
@@ -34,6 +27,27 @@ const loading = ref(true);
 const isOwner = computed(() => room.value?.owner_id === auth.user?.id);
 const myRole = computed(() => members.value.find((m) => m.user_id === auth.user?.id)?.role);
 const isAdmin = computed(() => isOwner.value || myRole.value === "admin");
+
+const tabs = computed(() => [
+  { label: "Habits", slot: "habits", value: "habits", icon: "i-lucide-list-checks" },
+  ...(isAdmin.value || room.value?.show_leaderboard
+    ? [{ label: "Leaderboard", slot: "leaderboard", value: "leaderboard", icon: "i-lucide-trophy" }]
+    : []),
+  ...(isAdmin.value ? [{ label: "Feed", slot: "feed", value: "feed", icon: "i-lucide-activity" }] : []),
+  ...(isAdmin.value || room.value?.show_members
+    ? [{ label: "Members", slot: "members", value: "members", icon: "i-lucide-users" }]
+    : []),
+]);
+
+const tab = computed({
+  get: () => {
+    const active = view.activeTabs[roomId] ?? "habits";
+    return tabs.value.some((t) => t.value === active) ? active : "habits";
+  },
+  set: (value: string) => {
+    view.activeTabs[roomId] = value;
+  },
+});
 
 const roomFilePrefix = computed(() => {
   const slug = (room.value?.name ?? String(roomId)).toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -77,7 +91,10 @@ async function loadFeed(more = false) {
 onMounted(async () => {
   try {
     await loadCore();
-    await Promise.all([loadLeaderboard(), loadFeed()]);
+    const jobs: Promise<unknown>[] = [];
+    if (isAdmin.value || room.value?.show_leaderboard) jobs.push(loadLeaderboard());
+    if (isAdmin.value) jobs.push(loadFeed());
+    await Promise.all(jobs);
   } catch {
     toast.add({ title: "Room not found", color: "error" });
     router.replace("/app/rooms");
@@ -203,7 +220,7 @@ async function openLinkPicker(item: RoomHabitWithLink) {
   linkPickerFor.value = item;
   // Only same-type habits not already linked to a habit in this room.
   const linkedIds = new Set(habits.value.map((h) => h.linked_habit_id).filter(Boolean));
-  myHabits.value = (await apiFetch<Habit[]>("/habits", { query: { archived: false } })).filter(
+  myHabits.value = (await apiFetch<Habit[]>("/habits")).filter(
     (h) => h.type === item.habit.type && !linkedIds.has(h.id),
   );
 }
@@ -297,6 +314,40 @@ function memberMenu(member: RoomMember): DropdownMenuItem[][] {
   return items;
 }
 
+const settingsOpen = ref(false);
+const settingsBusy = ref(false);
+const settingsForm = reactive({
+  name: "",
+  description: "",
+  show_leaderboard: true,
+  show_members: true,
+});
+
+function openSettings() {
+  if (!room.value) return;
+  settingsForm.name = room.value.name;
+  settingsForm.description = room.value.description;
+  settingsForm.show_leaderboard = room.value.show_leaderboard;
+  settingsForm.show_members = room.value.show_members;
+  settingsOpen.value = true;
+}
+
+async function saveSettings() {
+  settingsBusy.value = true;
+  try {
+    room.value = await apiFetch<Room>(`/rooms/${roomId}`, {
+      method: "PATCH",
+      body: { ...settingsForm },
+    });
+    settingsOpen.value = false;
+    toast.add({ title: "Room settings saved", color: "success" });
+  } catch {
+    toast.add({ title: "Could not save room settings", color: "error" });
+  } finally {
+    settingsBusy.value = false;
+  }
+}
+
 const deleteRoomOpen = ref(false);
 
 async function deleteRoom() {
@@ -328,13 +379,6 @@ function feedText(event: FeedEvent): string {
   }
 }
 
-const tabs = [
-  { label: "Habits", slot: "habits", value: "habits", icon: "i-lucide-list-checks" },
-  { label: "Leaderboard", slot: "leaderboard", value: "leaderboard", icon: "i-lucide-trophy" },
-  { label: "Feed", slot: "feed", value: "feed", icon: "i-lucide-activity" },
-  { label: "Members", slot: "members", value: "members", icon: "i-lucide-users" },
-];
-
 function openMember(member: RoomMember) {
   view.viewedMember = member;
   navigateTo(`/app/rooms/${roomId}/members/${member.user_id}`);
@@ -364,6 +408,14 @@ function openMember(member: RoomMember) {
             label="Invite"
             variant="subtle"
             @click="showInvite"
+          />
+          <UButton
+            v-if="isAdmin"
+            icon="i-lucide-settings"
+            color="neutral"
+            variant="ghost"
+            aria-label="Room settings"
+            @click="openSettings"
           />
           <UButton
             v-if="isOwner"
@@ -778,6 +830,40 @@ function openMember(member: RoomMember) {
             <p v-else class="text-xs text-muted">
               No compatible habits to link — create one from the template above.
             </p>
+          </div>
+        </template>
+      </UModal>
+
+      <UModal v-model:open="settingsOpen" title="Room settings">
+        <template #body>
+          <form class="flex flex-col gap-4" @submit.prevent="saveSettings">
+            <UFormField label="Name" required>
+              <UInput v-model="settingsForm.name" class="w-full" />
+            </UFormField>
+            <UFormField label="Description">
+              <UTextarea v-model="settingsForm.description" class="w-full" :rows="3" />
+            </UFormField>
+            <USwitch
+              v-model="settingsForm.show_leaderboard"
+              label="Show leaderboard to members"
+              description="Admins always see it."
+            />
+            <USwitch
+              v-model="settingsForm.show_members"
+              label="Show member list to members"
+              description="Admins always see it."
+            />
+          </form>
+        </template>
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton color="neutral" variant="ghost" label="Cancel" @click="settingsOpen = false" />
+            <UButton
+              :loading="settingsBusy"
+              :disabled="!settingsForm.name.trim()"
+              label="Save"
+              @click="saveSettings"
+            />
           </div>
         </template>
       </UModal>

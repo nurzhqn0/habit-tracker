@@ -52,7 +52,7 @@ async def _resend_snoozed(bot: Bot, session_factory: async_sessionmaker) -> None
             habit = (
                 await session.execute(select(HabitRow).where(HabitRow.id == habit_id))
             ).scalar_one_or_none()
-        if habit is None or habit.archived:
+        if habit is None:
             continue
 
         _sent.discard((telegram_id, habit_id, date_raw))

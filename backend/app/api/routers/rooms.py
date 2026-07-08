@@ -89,13 +89,20 @@ async def invite_by_username(
 
 @router.get("/{room_id}/members", response_model=list[MemberOut])
 async def members(room_id: int, user: CurrentUserDep, session: SessionDep) -> list[MemberOut]:
-    await rooms_uc._require_member(session, room_id, user.id)
+    room = await rooms_uc._require_member(session, room_id, user.id)
+    rows = await RoomRepo(session).members_with_users(room_id)
+    if not room.show_members and room.owner_id != user.id:
+        # Hidden member list: plain members only see their own row (the frontend
+        # still needs it to derive the caller's role).
+        me = next(m for m, u in rows if u.id == user.id)
+        if me.role not in ("owner", "admin"):
+            rows = [(m, u) for m, u in rows if u.id == user.id]
     return [
         MemberOut(
             user_id=u.id, first_name=u.first_name, username=u.username,
             photo_url=f"/api/v1/avatars/{u.id}", role=m.role, joined_at=m.joined_at,
         )
-        for m, u in await RoomRepo(session).members_with_users(room_id)
+        for m, u in rows
     ]
 
 
@@ -198,7 +205,7 @@ async def feed(
     cursor: int | None = None,
     limit: int = Query(default=30, le=100),
 ) -> list[FeedEventOut]:
-    await rooms_uc._require_member(session, room_id, user.id)
+    await rooms_uc._require_admin(session, room_id, user.id)
     events = await RoomRepo(session).feed(room_id, cursor, limit)
 
     user_ids = {e.user_id for e in events}

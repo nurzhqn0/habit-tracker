@@ -61,13 +61,6 @@ async def delete_habit(session: AsyncSession, user_id: int, habit_id: int) -> No
     await session.commit()
 
 
-async def set_archived(session: AsyncSession, user_id: int, habit_id: int, archived: bool) -> HabitRow:
-    habit = await HabitRepo(session).get_owned(habit_id, user_id)
-    habit.archived = archived
-    await session.commit()
-    return habit
-
-
 async def reorder_habits(session: AsyncSession, user_id: int, ordered_ids: list[int]) -> None:
     repo = HabitRepo(session)
     habits = {h.id: h for h in await repo.list_for_user(user_id)}
@@ -83,21 +76,24 @@ async def get_overview(
     user_id: int,
     from_date: Date,
     to_date: Date,
-    include_archived: bool = False,
     sort: str = "manual",
     habit_ids: list[int] | None = None,
+    since: Date | None = None,
 ) -> list[HabitOverviewItem]:
     """Bulk main-screen payload: every habit + computed entries in range + score + streak."""
     prefs = await UserRepo(session).get_or_create_preferences(user_id)
     today = habit_math.user_today(prefs)
 
-    rows = await HabitRepo(session).list_for_user(
-        user_id, archived=None if include_archived else False
-    )
+    rows = await HabitRepo(session).list_for_user(user_id)
     if habit_ids is not None:
         wanted = set(habit_ids)
         rows = [r for r in rows if r.id in wanted]
     entries_by_habit = await EntryRepo(session).all_for_habits([r.id for r in rows])
+    if since is not None:
+        entries_by_habit = {
+            habit_id: [r for r in rows_ if r.date >= since]
+            for habit_id, rows_ in entries_by_habit.items()
+        }
 
     items: list[HabitOverviewItem] = []
     for row in rows:
