@@ -4,11 +4,18 @@ from datetime import date as Date
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    WebAppInfo,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.application.use_cases import entries as entries_uc
+from app.config import get_settings
 from app.domain.errors import DomainError
 from app.domain.models.entry import SKIP, YES_MANUAL
 from app.domain.models.habit import HabitType
@@ -38,6 +45,19 @@ def done_value(habit) -> int:
     return YES_MANUAL
 
 
+def _open_app_keyboard() -> InlineKeyboardMarkup | None:
+    """An 'Open app' Mini App button. Telegram only accepts https web_app URLs,
+    so it is omitted in local (http) dev."""
+    origin = get_settings().frontend_origin
+    if not origin.startswith("https://"):
+        return None
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📲 Open app", web_app=WebAppInfo(url=f"{origin}/app"))]
+        ]
+    )
+
+
 @router.message(CommandStart())
 async def on_start(message: Message) -> None:
     assert session_factory is not None
@@ -52,7 +72,8 @@ async def on_start(message: Message) -> None:
         user.bot_linked = True
         await session.commit()
     await message.answer(
-        f"Connected! 🎉 Hi {message.from_user.first_name} — I'll send your habit reminders here."
+        f"Connected! 🎉 Hi {message.from_user.first_name} — I'll send your habit reminders here.",
+        reply_markup=_open_app_keyboard(),
     )
 
 
