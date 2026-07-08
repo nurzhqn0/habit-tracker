@@ -32,18 +32,17 @@ export default defineNuxtPlugin(async () => {
   wa.disableVerticalSwipes?.();
   wa.enableClosingConfirmation();
 
-  // Adopt Telegram's light/dark scheme and paint the native chrome to match.
+  // Paint Telegram's native chrome to match the app's resolved theme. The
+  // theme itself follows the user's saved preference (applied by the dashboard
+  // layout) — Telegram's own scheme must not override the user's choice. These
+  // hexes mirror --ui-bg (see assets/css/main.css) for light and dark.
   const colorMode = useColorMode();
-  const applyTheme = () => {
-    colorMode.preference = wa.colorScheme;
-    const bg = wa.themeParams.bg_color;
-    if (bg) {
-      wa.setBackgroundColor?.(bg);
-      wa.setHeaderColor?.(bg);
-    }
+  const paintChrome = () => {
+    const bg = colorMode.value === "dark" ? "#1c1917" : "#fbfbfa";
+    wa.setBackgroundColor?.(bg);
+    wa.setHeaderColor?.(bg);
   };
-  applyTheme();
-  wa.onEvent("themeChanged", applyTheme);
+  watch(() => colorMode.value, paintChrome, { immediate: true });
 
   // Sign in with initData if there is no existing session.
   const auth = useAuthStore();

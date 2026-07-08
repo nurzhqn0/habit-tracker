@@ -9,9 +9,9 @@ const { isMiniApp } = useTelegram();
 const colorMode = useColorMode();
 
 // Apply the user's saved theme on load so the toggle reflects their choice
-// instead of the default. In the Mini App, Telegram's theme wins (set in plugin).
+// instead of the default. This wins over Telegram's scheme in the Mini App too
+// — the plugin only paints the native chrome to match.
 onMounted(async () => {
-  if (isMiniApp.value) return;
   const prefs = await apiFetch<Preferences>("/me/preferences").catch(() => null);
   if (prefs?.theme) colorMode.preference = prefs.theme;
 });
