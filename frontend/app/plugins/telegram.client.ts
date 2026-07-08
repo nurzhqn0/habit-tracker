@@ -56,20 +56,26 @@ export default defineNuxtPlugin(async () => {
     }
   }
 
+  const router = useRouter();
+
   // No marketing landing inside Telegram — go straight to the app.
   // Handle deep links: startapp=join_{code} navigates to the room join page.
+  // Navigating here (during plugin init) races Nuxt's initial navigation and
+  // is silently dropped, so defer to app:mounted when the router is free.
   if (auth.isLoggedIn) {
     const startParam = wa.initDataUnsafe?.start_param;
-    if (startParam?.startsWith("join_")) {
-      const code = startParam.slice(5);
-      await navigateTo(`/app/rooms/join/${code}`, { replace: true });
-    } else if (useRoute().path === "/") {
-      await navigateTo("/app");
+    const target = startParam?.startsWith("join_")
+      ? `/app/rooms/join/${startParam.slice(5)}`
+      : useRoute().path === "/"
+        ? "/app"
+        : null;
+    if (target) {
+      useNuxtApp().hooks.hookOnce("app:mounted", () => {
+        navigateTo(target);
+      });
     }
   }
-
   // Native back button: shown on any nested /app page, hidden on the roots.
-  const router = useRouter();
   const back = () => router.back();
   wa.BackButton.onClick(back);
   const ROOTS = new Set(["/app", "/app/rooms", "/app/settings", "/"]);
