@@ -34,12 +34,17 @@ async def run() -> None:
     dispatcher.include_router(handlers.router)
 
     # Persistent "Open app" button next to the message input.
-    await bot.set_chat_menu_button(
-        menu_button=MenuButtonWebApp(
-            text="Open app", web_app=WebAppInfo(url=f"{settings.frontend_origin}/app")
+    # Telegram requires HTTPS — fix up if misconfigured.
+    webapp_origin = settings.frontend_origin.replace("http://", "https://", 1)
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text="Open app", web_app=WebAppInfo(url=f"{webapp_origin}/app")
+            )
         )
-    )
-    log.info("Menu button set with URL: %s/app", settings.frontend_origin)
+        log.info("Menu button set with URL: %s/app", webapp_origin)
+    except Exception as exc:
+        log.warning("Failed to set menu button: %s", exc)
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(reminder_tick, "cron", second=0, args=[bot, session_factory])

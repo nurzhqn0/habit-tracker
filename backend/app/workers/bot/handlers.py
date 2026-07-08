@@ -47,7 +47,7 @@ def done_value(habit) -> int:
 
 def _open_app_keyboard() -> InlineKeyboardMarkup:
     """An 'Open app' Mini App button."""
-    origin = get_settings().frontend_origin
+    origin = get_settings().frontend_origin.replace("http://", "https://", 1)
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="📲 Open app", web_app=WebAppInfo(url=f"{origin}/app"))]

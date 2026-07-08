@@ -95,8 +95,9 @@ async def invite_by_username(
         return "not_linked", uname
 
     from aiogram.exceptions import TelegramAPIError
-    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
+    webapp_link = join_link.replace("http://", "https://", 1)
     inviter = await UserRepo(session).get_by_id(user_id)
     try:
         await bot.send_message(
@@ -104,7 +105,7 @@ async def invite_by_username(
             f"👋 {inviter.first_name} invited you to join *{room.name}* on HabitFlow",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="Join room", url=join_link)]]
+                inline_keyboard=[[InlineKeyboardButton(text="Join room", web_app=WebAppInfo(url=webapp_link))]]
             ),
         )
     except TelegramAPIError:
