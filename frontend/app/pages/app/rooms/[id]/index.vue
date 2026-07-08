@@ -49,11 +49,6 @@ const tab = computed({
   },
 });
 
-const roomFilePrefix = computed(() => {
-  const slug = (room.value?.name ?? String(roomId)).toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  return `room-${slug}-report`;
-});
-
 useHead({ title: computed(() => room.value?.name ?? "Room") });
 
 const inviteOpen = ref(false);
@@ -397,11 +392,7 @@ function openMember(member: RoomMember) {
           <USkeleton v-else class="h-5 w-32" />
         </template>
         <template #right>
-          <ExportMenu
-            v-if="isAdmin"
-            :path="`/rooms/${roomId}/export/xlsx`"
-            :filename-prefix="roomFilePrefix"
-          />
+          <ExportMenu v-if="isAdmin" :path="`/rooms/${roomId}/export/xlsx`" />
           <UButton
             v-if="isAdmin"
             icon="i-lucide-user-plus"

@@ -1,9 +1,20 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from "@nuxt/ui";
+import type { Preferences } from "~~/shared/types/api";
+import { apiFetch } from "~/services/api/client";
 
 const auth = useAuthStore();
 const route = useRoute();
 const { isMiniApp } = useTelegram();
+const colorMode = useColorMode();
+
+// Apply the user's saved theme on load so the toggle reflects their choice
+// instead of the default. In the Mini App, Telegram's theme wins (set in plugin).
+onMounted(async () => {
+  if (isMiniApp.value) return;
+  const prefs = await apiFetch<Preferences>("/me/preferences").catch(() => null);
+  if (prefs?.theme) colorMode.preference = prefs.theme;
+});
 
 const items = computed<NavigationMenuItem[]>(() => [
   { label: "Habits", icon: "i-lucide-list-checks", to: "/app" },
@@ -39,7 +50,7 @@ function isActive(to: string): boolean {
             </span>
           </UTooltip>
           <UColorModeButton v-if="!isMiniApp" />
-          <UTooltip text="Logout">
+          <UTooltip v-if="!isMiniApp" text="Logout">
             <UButton
               icon="i-lucide-log-out"
               color="neutral"

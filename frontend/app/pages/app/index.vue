@@ -139,7 +139,7 @@ async function onDragEnd() {
         </template>
         <template #right>
           <USelect v-model="period" :items="periodItems" size="sm" class="w-24" aria-label="Period" />
-          <ExportMenu path="/export/report/xlsx" filename-prefix="habits-report" />
+          <ExportMenu path="/export/report/xlsx" />
           <UDropdownMenu :items="sortItems">
             <UButton icon="i-lucide-arrow-up-down" color="neutral" variant="ghost" aria-label="Sort" />
           </UDropdownMenu>
@@ -164,8 +164,8 @@ async function onDragEnd() {
         <UButton icon="i-lucide-plus" label="Create habit" @click="openCreate" />
       </div>
 
-      <div v-else class="overflow-x-auto">
-        <div class="min-w-fit">
+      <div v-else class="min-w-fit">
+        <div>
           <div class="flex items-center gap-2 border-b border-default pb-2">
             <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
               <div class="w-6 shrink-0" />

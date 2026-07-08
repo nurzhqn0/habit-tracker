@@ -112,8 +112,8 @@ watch(period, () => {
         </p>
       </div>
 
-      <div v-else class="overflow-x-auto">
-        <div class="min-w-fit">
+      <div v-else class="min-w-fit">
+        <div>
           <div class="flex items-center gap-2 border-b border-default pb-2">
             <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
               <div class="min-w-28 flex-1 sm:min-w-40" />

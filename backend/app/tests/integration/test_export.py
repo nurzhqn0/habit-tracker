@@ -148,6 +148,41 @@ async def test_import_loop_android_format(client):
     assert entries.json()[0]["value"] == 2  # newest row imported despite no header
 
 
+async def test_export_telegram_requires_bot_link(client):
+    headers = bearer(await login(client, 4100))
+    response = await client.get("/export/xlsx", params={"to_telegram": "1"}, headers=headers)
+    assert response.status_code == 422
+
+
+async def test_export_telegram_delivers(client, monkeypatch):
+    from sqlalchemy import update
+
+    from app.api.routers import export as export_router
+    from app.infrastructure.db.tables import UserRow
+
+    headers = bearer(await login(client, 4101))
+    async with client.session_factory() as session:
+        await session.execute(
+            update(UserRow).where(UserRow.telegram_id == 4101).values(bot_linked=True)
+        )
+        await session.commit()
+
+    sent = {}
+
+    async def fake_send(bot_token, chat_id, filename, content, caption=None):
+        sent.update(chat_id=chat_id, filename=filename, size=len(content))
+        return True
+
+    monkeypatch.setattr(export_router, "send_document", fake_send)
+
+    response = await client.get("/export/xlsx", params={"to_telegram": "1"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "delivered": "telegram"}
+    assert sent["chat_id"] == 4101
+    assert sent["filename"] == "habitflow-export.xlsx"
+    assert sent["size"] > 0
+
+
 async def test_import_rejects_garbage(client):
     headers = bearer(await login(client, 4004))
     response = await client.post(

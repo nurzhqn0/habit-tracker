@@ -8,8 +8,7 @@ useHead({ title: "Settings" });
 const toast = useToast();
 const auth = useAuthStore();
 const colorMode = useColorMode();
-const { botUsername } = useRuntimeConfig().public;
-const { download } = useDownload();
+const { sendToTelegram, sending } = useDownload();
 
 const prefs = ref<Preferences | null>(null);
 const importing = ref(false);
@@ -60,8 +59,6 @@ async function onImportFile(event: Event) {
     if (fileInput.value) fileInput.value.value = "";
   }
 }
-
-const botLink = computed(() => (botUsername ? `https://t.me/${botUsername}?start=link` : null));
 </script>
 
 <template>
@@ -126,55 +123,26 @@ const botLink = computed(() => (botUsername ? `https://t.me/${botUsername}?start
 
         <UCard>
           <template #header>
-            <p class="font-semibold text-highlighted">Telegram notifications</p>
-          </template>
-          <div class="flex flex-col gap-5">
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <p class="text-sm font-medium text-default">Bot connection</p>
-                <p class="text-sm text-muted">
-                  {{ auth.user?.bot_linked ? "Connected — the bot can send you reminders." : "Connect the bot to receive reminders in Telegram." }}
-                </p>
-              </div>
-              <UBadge v-if="auth.user?.bot_linked" color="success" variant="subtle" icon="i-lucide-check">
-                Connected
-              </UBadge>
-              <UButton
-                v-else-if="botLink"
-                :to="botLink"
-                target="_blank"
-                icon="i-lucide-send"
-                label="Connect bot"
-              />
-              <UBadge v-else color="neutral" variant="subtle">Bot not configured</UBadge>
-            </div>
-            <USwitch
-              :model-value="prefs.reminders_enabled"
-              label="Habit reminders"
-              @update:model-value="(v: boolean) => save({ reminders_enabled: v })"
-            />
-          </div>
-        </UCard>
-
-        <UCard>
-          <template #header>
             <p class="font-semibold text-highlighted">Data</p>
           </template>
           <div class="flex flex-col gap-4">
             <div class="flex flex-wrap gap-2">
               <UButton
-                icon="i-lucide-download"
+                icon="i-lucide-send"
                 label="Export CSV (Loop format)"
                 variant="subtle"
-                @click="download('/export/csv', 'habitflow-export.zip')"
+                :loading="sending"
+                @click="sendToTelegram('/export/csv')"
               />
               <UButton
-                icon="i-lucide-file-spreadsheet"
+                icon="i-lucide-send"
                 label="Export Excel"
                 variant="subtle"
-                @click="download('/export/xlsx', 'habitflow-export.xlsx')"
+                :loading="sending"
+                @click="sendToTelegram('/export/xlsx')"
               />
             </div>
+            <p class="text-xs text-muted">Exports are delivered to your Telegram chat by the bot.</p>
             <div>
               <UButton
                 icon="i-lucide-upload"

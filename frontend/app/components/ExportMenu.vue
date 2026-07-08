@@ -5,17 +5,16 @@ import { todayKey, shiftDateKey } from "~/composables/useDates";
 
 const props = defineProps<{
   path: string;
-  filenamePrefix: string;
 }>();
 
-const { download, downloading } = useDownload();
+const { sendToTelegram, sending } = useDownload();
 const open = ref(false);
 const range = shallowRef<DateRange | null>(null);
 const maxDate = parseDate(todayKey());
 
 async function run(from: string, to: string) {
   open.value = false;
-  await download(props.path, `${props.filenamePrefix}_${from}_${to}.xlsx`, { from, to });
+  await sendToTelegram(props.path, { from, to });
 }
 
 function runRange() {
@@ -27,11 +26,11 @@ function runRange() {
 <template>
   <UPopover v-model:open="open">
     <UButton
-      icon="i-lucide-download"
+      icon="i-lucide-send"
       label="Export"
       color="neutral"
       variant="ghost"
-      :loading="downloading"
+      :loading="sending"
       aria-label="Export"
       :ui="{ label: 'hidden sm:inline' }"
     />

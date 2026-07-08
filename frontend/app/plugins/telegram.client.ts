@@ -56,6 +56,9 @@ export default defineNuxtPlugin(async () => {
     }
   }
 
+  // No marketing landing inside Telegram — go straight to the app.
+  if (auth.isLoggedIn && useRoute().path === "/") await navigateTo("/app");
+
   // Native back button: shown on any nested /app page, hidden on the roots.
   const router = useRouter();
   const back = () => router.back();

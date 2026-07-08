@@ -1,11 +1,13 @@
 from datetime import date
 
-from fastapi import APIRouter, Query, UploadFile
-from fastapi.responses import Response
+from fastapi import APIRouter, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse, Response
 
-from app.api.deps import CurrentUserDep, SessionDep
+from app.api.deps import CurrentUserDep, SessionDep, SettingsDep
 from app.application.use_cases import csv_io, xlsx_reports
 from app.domain.errors import ValidationError
+from app.infrastructure.db.tables import UserRow
+from app.infrastructure.telegram.bot_api import send_document
 
 router = APIRouter(tags=["export"])
 
@@ -20,9 +22,25 @@ def _xlsx_response(data: bytes, filename: str) -> Response:
     )
 
 
+async def _deliver(
+    user: UserRow, settings: SettingsDep, data: bytes, filename: str, caption: str, media: str
+) -> Response:
+    """Sends the file to the user's Telegram chat instead of returning it for download."""
+    if not user.bot_linked:
+        raise ValidationError("Connect the Telegram bot first, then export again.")
+    ok = await send_document(settings.bot_token, user.telegram_id, filename, data, caption)
+    if not ok:
+        raise HTTPException(status_code=502, detail="Telegram could not deliver the file.")
+    return JSONResponse({"ok": True, "delivered": "telegram"})
+
+
 @router.get("/export/csv")
-async def export_all_csv(user: CurrentUserDep, session: SessionDep) -> Response:
+async def export_all_csv(
+    user: CurrentUserDep, session: SessionDep, settings: SettingsDep, to_telegram: bool = False
+) -> Response:
     data = await csv_io.export_zip(session, user.id)
+    if to_telegram:
+        return await _deliver(user, settings, data, "habitflow-export.zip", "Your HabitFlow export", ZIP_MEDIA)
     return Response(
         data, media_type=ZIP_MEDIA,
         headers={"Content-Disposition": 'attachment; filename="habitflow-export.zip"'},
@@ -30,8 +48,12 @@ async def export_all_csv(user: CurrentUserDep, session: SessionDep) -> Response:
 
 
 @router.get("/export/xlsx")
-async def export_all_xlsx(user: CurrentUserDep, session: SessionDep) -> Response:
+async def export_all_xlsx(
+    user: CurrentUserDep, session: SessionDep, settings: SettingsDep, to_telegram: bool = False
+) -> Response:
     data = await csv_io.export_xlsx(session, user.id)
+    if to_telegram:
+        return await _deliver(user, settings, data, "habitflow-export.xlsx", "Your HabitFlow export", XLSX_MEDIA)
     return _xlsx_response(data, "habitflow-export.xlsx")
 
 
@@ -39,11 +61,16 @@ async def export_all_xlsx(user: CurrentUserDep, session: SessionDep) -> Response
 async def export_personal_report(
     user: CurrentUserDep,
     session: SessionDep,
+    settings: SettingsDep,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    to_telegram: bool = False,
 ) -> Response:
     data, frm, to = await xlsx_reports.export_personal_xlsx(session, user.id, from_date, to_date)
-    return _xlsx_response(data, f"habits-report_{frm}_{to}.xlsx")
+    filename = f"habits-report_{frm}_{to}.xlsx"
+    if to_telegram:
+        return await _deliver(user, settings, data, filename, f"Habits report {frm} → {to}", XLSX_MEDIA)
+    return _xlsx_response(data, filename)
 
 
 @router.get("/rooms/{room_id}/export/xlsx")
@@ -51,11 +78,16 @@ async def export_room_report(
     room_id: int,
     user: CurrentUserDep,
     session: SessionDep,
+    settings: SettingsDep,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    to_telegram: bool = False,
 ) -> Response:
     data, frm, to = await xlsx_reports.export_room_xlsx(session, user.id, room_id, from_date, to_date)
-    return _xlsx_response(data, f"room-{room_id}-report_{frm}_{to}.xlsx")
+    filename = f"room-{room_id}-report_{frm}_{to}.xlsx"
+    if to_telegram:
+        return await _deliver(user, settings, data, filename, f"Room report {frm} → {to}", XLSX_MEDIA)
+    return _xlsx_response(data, filename)
 
 
 @router.get("/habits/{habit_id}/export/csv")
