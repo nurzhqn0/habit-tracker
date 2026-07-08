@@ -43,6 +43,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in .env}
       BOT_USERNAME: ${BOT_USERNAME:-}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}  # Mini App URL for the Open-app buttons
     volumes:
       - sqlite-data:/srv/app/data
     depends_on:
