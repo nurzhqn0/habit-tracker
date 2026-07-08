@@ -66,7 +66,8 @@ async def on_start(message: Message) -> None:
         if user is None:
             await message.answer(
                 "I don't recognize this Telegram account yet.\n"
-                "Log in on the website first, then tap Connect bot in Settings."
+                "Open the app first (tap the menu button below), then send /start again.",
+                reply_markup=_open_app_keyboard(),
             )
             return
         user.bot_linked = True
