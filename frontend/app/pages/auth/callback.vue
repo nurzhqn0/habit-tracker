@@ -46,7 +46,7 @@ onMounted(async () => {
     <template v-else>
       <UIcon name="i-lucide-circle-alert" class="size-8 text-error" />
       <p class="max-w-xs text-muted">{{ error }}</p>
-      <UButton to="/" label="Back to login" color="neutral" variant="subtle" />
+      <UButton to="/app" label="Back to app" color="neutral" variant="subtle" />
     </template>
   </div>
 </template>

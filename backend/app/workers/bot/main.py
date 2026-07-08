@@ -33,14 +33,13 @@ async def run() -> None:
     dispatcher = Dispatcher()
     dispatcher.include_router(handlers.router)
 
-    # Persistent "Open app" button next to the message input (Telegram needs
-    # an https URL, so skip it in local http dev).
-    if settings.frontend_origin.startswith("https://"):
-        await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(
-                text="Open app", web_app=WebAppInfo(url=f"{settings.frontend_origin}/app")
-            )
+    # Persistent "Open app" button next to the message input.
+    await bot.set_chat_menu_button(
+        menu_button=MenuButtonWebApp(
+            text="Open app", web_app=WebAppInfo(url=f"{settings.frontend_origin}/app")
         )
+    )
+    log.info("Menu button set with URL: %s/app", settings.frontend_origin)
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(reminder_tick, "cron", second=0, args=[bot, session_factory])

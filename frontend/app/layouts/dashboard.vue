@@ -50,15 +50,6 @@ function isActive(to: string): boolean {
             </span>
           </UTooltip>
           <UColorModeButton v-if="!isMiniApp" />
-          <UTooltip v-if="!isMiniApp" text="Logout">
-            <UButton
-              icon="i-lucide-log-out"
-              color="neutral"
-              variant="ghost"
-              aria-label="Logout"
-              @click="auth.logout()"
-            />
-          </UTooltip>
         </div>
       </template>
     </UDashboardSidebar>

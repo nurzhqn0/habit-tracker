@@ -160,21 +160,7 @@ async function onImportFile(event: Event) {
           </div>
         </UCard>
 
-        <UCard>
-          <template #header>
-            <p class="font-semibold text-highlighted">Account</p>
-          </template>
-          <div class="flex items-center justify-between gap-4">
-            <p class="text-sm text-muted">Sign out of HabitFlow on this device.</p>
-            <UButton
-              icon="i-lucide-log-out"
-              label="Log out"
-              color="neutral"
-              variant="subtle"
-              @click="auth.logout()"
-            />
-          </div>
-        </UCard>
+
       </div>
     </template>
   </UDashboardPanel>

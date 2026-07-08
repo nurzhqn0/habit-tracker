@@ -77,7 +77,7 @@ export const useAuthStore = defineStore("auth", {
       access.value = null;
       refresh.value = null;
       this.user = null;
-      navigateTo("/");
+      navigateTo("/app");
     },
   },
 });

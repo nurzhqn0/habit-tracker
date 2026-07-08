@@ -45,12 +45,9 @@ def done_value(habit) -> int:
     return YES_MANUAL
 
 
-def _open_app_keyboard() -> InlineKeyboardMarkup | None:
-    """An 'Open app' Mini App button. Telegram only accepts https web_app URLs,
-    so it is omitted in local (http) dev."""
+def _open_app_keyboard() -> InlineKeyboardMarkup:
+    """An 'Open app' Mini App button."""
     origin = get_settings().frontend_origin
-    if not origin.startswith("https://"):
-        return None
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="📲 Open app", web_app=WebAppInfo(url=f"{origin}/app"))]
