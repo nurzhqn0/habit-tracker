@@ -3,6 +3,7 @@ import type { NavigationMenuItem } from "@nuxt/ui";
 
 const auth = useAuthStore();
 const route = useRoute();
+const { isMiniApp } = useTelegram();
 
 const items = computed<NavigationMenuItem[]>(() => [
   { label: "Habits", icon: "i-lucide-list-checks", to: "/app" },
@@ -37,7 +38,7 @@ function isActive(to: string): boolean {
               {{ auth.user?.first_name }}
             </span>
           </UTooltip>
-          <UColorModeButton />
+          <UColorModeButton v-if="!isMiniApp" />
           <UTooltip text="Logout">
             <UButton
               icon="i-lucide-log-out"

@@ -26,6 +26,15 @@ export const useAuthStore = defineStore("auth", {
       this._applyTokens(response);
     },
 
+    /** Mini App flow — logs in with the initData Telegram injects into the webview. */
+    async loginWithTelegramMiniApp(initData: string) {
+      const response = await apiFetch<TokenResponse>("/auth/telegram/miniapp", {
+        method: "POST",
+        body: { init_data: initData },
+      });
+      this._applyTokens(response);
+    },
+
     /** Redirect (authorization code) flow — used where popups are blocked. */
     async loginWithTelegramCode(code: string, codeVerifier: string, redirectUri: string) {
       const response = await apiFetch<TokenResponse>("/auth/telegram/code", {

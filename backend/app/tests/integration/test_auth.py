@@ -1,6 +1,12 @@
 import time
 
-from app.tests.integration.conftest import _ROGUE_KEY, bearer, login, make_id_token
+from app.tests.integration.conftest import (
+    _ROGUE_KEY,
+    bearer,
+    login,
+    make_id_token,
+    make_init_data,
+)
 
 
 async def test_login_creates_user_and_tokens(client):
@@ -48,6 +54,39 @@ async def test_garbage_token_rejected(client):
 async def test_token_without_user_id_rejected(client):
     token = make_id_token(1005, id=None)
     response = await client.post("/auth/telegram", json={"id_token": token})
+    assert response.status_code == 403
+
+
+async def test_miniapp_login_creates_user_and_tokens(client):
+    response = await client.post(
+        "/auth/telegram/miniapp", json={"init_data": make_init_data(2000)}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["user"]["telegram_id"] == 2000
+    assert body["user"]["username"] == "alice2000"
+    assert body["access_token"]
+
+    me = await client.get("/me", headers=bearer(body))
+    assert me.json()["first_name"] == "Alice"
+
+
+async def test_miniapp_forged_hash_rejected(client):
+    init_data = make_init_data(2001, bot_token="99999:rogue-bot-token")
+    response = await client.post("/auth/telegram/miniapp", json={"init_data": init_data})
+    assert response.status_code == 403
+
+
+async def test_miniapp_stale_auth_date_rejected(client):
+    import time
+
+    init_data = make_init_data(2002, auth_date=int(time.time()) - 172_800)
+    response = await client.post("/auth/telegram/miniapp", json={"init_data": init_data})
+    assert response.status_code == 403
+
+
+async def test_miniapp_garbage_rejected(client):
+    response = await client.post("/auth/telegram/miniapp", json={"init_data": "not-init-data"})
     assert response.status_code == 403
 
 

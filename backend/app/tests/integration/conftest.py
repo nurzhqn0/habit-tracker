@@ -1,5 +1,9 @@
+import hashlib
+import hmac
+import json
 import time
 from collections.abc import AsyncIterator
+from urllib.parse import urlencode
 
 import jwt
 import pytest
@@ -50,6 +54,25 @@ def make_id_token(telegram_id: int = 1000, *, key=None, **overrides) -> str:
     return jwt.encode(
         {k: v for k, v in claims.items() if v is not None}, key or _PRIVATE_KEY, algorithm="RS256"
     )
+
+
+def make_init_data(
+    telegram_id: int = 1000, *, bot_token: str | None = None, auth_date: int | None = None
+) -> str:
+    """Builds a Mini App initData string signed with the test bot token."""
+    user = {"id": telegram_id, "first_name": "Alice", "username": f"alice{telegram_id}"}
+    fields = {
+        "user": json.dumps(user, separators=(",", ":")),
+        "auth_date": str(auth_date if auth_date is not None else int(time.time())),
+    }
+    data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
+    secret_key = hmac.new(
+        b"WebAppData", (bot_token or TEST_SETTINGS.bot_token).encode(), hashlib.sha256
+    ).digest()
+    fields["hash"] = hmac.new(
+        secret_key, data_check_string.encode(), hashlib.sha256
+    ).hexdigest()
+    return urlencode(fields)
 
 
 @pytest.fixture

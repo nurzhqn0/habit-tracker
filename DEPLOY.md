@@ -196,6 +196,25 @@ which needs the callback URL and `TG_CLIENT_SECRET` above.
 After logging in, open **Settings → Connect bot** and press **Start** in the chat —
 reminders and room notifications are delivered from then on.
 
+### 7a. (Optional) Telegram Mini App
+
+The same frontend also runs as a Mini App — opened inside Telegram, it signs the
+user in automatically from the `initData` Telegram injects (verified on the backend
+with `BOT_TOKEN`), adopts Telegram's light/dark theme, and shows the native back
+button + haptics.
+
+1. In [@BotFather](https://t.me/BotFather): `/newapp` → pick your bot → set the
+   **Web App URL** to `https://habitflow.example.com/app`. (A menu-button app via
+   **Bot Settings → Menu Button** works too.)
+2. The live `nginx/nginx.conf` must let Telegram frame the site. The tracked
+   examples already do this — `nginx.conf` is gitignored, so mirror the change on
+   the server: **remove** `add_header X-Frame-Options DENY` and add
+   `frame-ancestors 'self' https://web.telegram.org https://telegram.org` to the
+   `Content-Security-Policy` header, then `docker compose restart nginx`.
+
+No new env vars — the Mini App SDK loads from `telegram.org` (already allowed by
+CSP) and logs in via `POST /auth/telegram/miniapp` on the same origin.
+
 ## 8. Backups
 
 Manual snapshot (WAL-safe, uses the sqlite3 backup API inside the container):

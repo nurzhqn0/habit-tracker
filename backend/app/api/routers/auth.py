@@ -7,6 +7,7 @@ from app.api.schemas.auth import (
     RefreshRequest,
     TelegramCodeLoginRequest,
     TelegramLoginRequest,
+    TelegramMiniAppLoginRequest,
     TokenResponse,
 )
 from app.application.use_cases import auth as auth_uc
@@ -23,6 +24,21 @@ async def telegram_login(
     request: Request, payload: TelegramLoginRequest, session: SessionDep, settings: SettingsDep
 ) -> TokenResponse:
     result = await auth_uc.telegram_login(session, payload.id_token, settings)
+    return TokenResponse(
+        access_token=result.access_token, refresh_token=result.refresh_token, user=result.user
+    )
+
+
+@router.post("/telegram/miniapp", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def telegram_miniapp_login(
+    request: Request,
+    payload: TelegramMiniAppLoginRequest,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> TokenResponse:
+    """Mini App login — verifies initData signed by the bot token."""
+    result = await auth_uc.telegram_miniapp_login(session, payload.init_data, settings)
     return TokenResponse(
         access_token=result.access_token, refresh_token=result.refresh_token, user=result.user
     )

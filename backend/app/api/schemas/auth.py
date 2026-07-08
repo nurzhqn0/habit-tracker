@@ -5,6 +5,10 @@ class TelegramLoginRequest(BaseModel):
     id_token: str
 
 
+class TelegramMiniAppLoginRequest(BaseModel):
+    init_data: str
+
+
 class TelegramCodeLoginRequest(BaseModel):
     code: str
     code_verifier: str

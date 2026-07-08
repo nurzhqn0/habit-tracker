@@ -13,6 +13,7 @@ from app.infrastructure.security.jwt import (
     generate_refresh_token,
     hash_refresh_token,
 )
+from app.infrastructure.telegram.miniapp_verifier import verify_init_data
 from app.infrastructure.telegram.oidc_verifier import exchange_code, verify_id_token
 
 
@@ -42,6 +43,27 @@ async def telegram_login(session: AsyncSession, id_token: str, settings: Setting
         first_name=str(claims.get("given_name") or claims.get("name") or ""),
         username=str(claims["preferred_username"]) if claims.get("preferred_username") else None,
         photo_url=str(claims["picture"]) if claims.get("picture") else None,
+    )
+    await users.get_or_create_preferences(user.id)
+    result = await _issue_tokens(session, user, settings)
+    await session.commit()
+    return result
+
+
+async def telegram_miniapp_login(
+    session: AsyncSession, init_data: str, settings: Settings
+) -> AuthResult:
+    """Mini App login — verifies the initData signed by the bot token."""
+    user_data = verify_init_data(init_data, settings.bot_token)
+    if user_data is None:
+        raise ForbiddenError("Invalid Telegram authentication data")
+
+    users = UserRepo(session)
+    user = await users.upsert_from_telegram(
+        telegram_id=int(user_data["id"]),
+        first_name=str(user_data.get("first_name") or ""),
+        username=str(user_data["username"]) if user_data.get("username") else None,
+        photo_url=str(user_data["photo_url"]) if user_data.get("photo_url") else None,
     )
     await users.get_or_create_preferences(user.id)
     result = await _issue_tokens(session, user, settings)

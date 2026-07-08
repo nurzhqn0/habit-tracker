@@ -10,6 +10,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{ toggle: [] }>();
 
+const { impact } = useTelegram();
+
+function onToggle() {
+  if (props.readonly) return;
+  impact("light");
+  emit("toggle");
+}
+
 const display = computed(() => {
   const value = props.value ?? UNKNOWN;
   switch (value) {
@@ -36,7 +44,7 @@ const display = computed(() => {
     :disabled="readonly"
     class="flex size-9 items-center justify-center rounded-md"
     :class="readonly ? '' : 'transition hover:bg-elevated active:scale-90'"
-    @click="!readonly && emit('toggle')"
+    @click="onToggle"
   >
     <UIcon :name="display.icon" class="size-5" :class="display.cls" :style="display.style" />
   </button>
