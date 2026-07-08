@@ -66,7 +66,8 @@ async def rotate_invite(
     room_id: int, user: CurrentUserDep, session: SessionDep, settings: SettingsDep
 ) -> dict:
     code = await rooms_uc.rotate_invite(session, user.id, room_id)
-    return {"invite_code": code, "link": f"{settings.frontend_origin}/app/rooms/join/{code}"}
+    link = f"https://t.me/{settings.bot_username}/habitflow?startapp=join_{code}"
+    return {"invite_code": code, "link": link}
 
 
 @router.post("/{room_id}/invite", response_model=InviteByUsernameOut)
@@ -79,7 +80,7 @@ async def invite_by_username(
     settings: SettingsDep,
 ) -> InviteByUsernameOut:
     room = await rooms_uc._require_admin(session, room_id, user.id)
-    link = f"{settings.frontend_origin}/app/rooms/join/{room.invite_code}"
+    link = f"https://t.me/{settings.bot_username}/habitflow?startapp=join_{room.invite_code}"
     bot = getattr(request.app.state, "bot", None)
     status, username = await rooms_uc.invite_by_username(
         session, bot, user.id, room_id, body.username, link

@@ -101,7 +101,8 @@ onMounted(async () => {
 watch(period, loadLeaderboard);
 
 function joinLink(code: string): string {
-  return `${window.location.origin}/app/rooms/join/${code}`;
+  const botUsername = useRuntimeConfig().public.botUsername;
+  return `https://t.me/${botUsername}/habitflow?startapp=join_${code}`;
 }
 
 function showInvite() {
@@ -156,9 +157,10 @@ async function sendUsernameInvite() {
 }
 
 const inviteShareUrl = computed(() => {
-  if (!inviteResult.value) return "";
-  const text = `Join “${room.value?.name}” on HabitFlow!`;
-  return `https://t.me/share/url?url=${encodeURIComponent(inviteResult.value.link)}&text=${encodeURIComponent(text)}`;
+  if (!room.value) return "";
+  const link = joinLink(room.value.invite_code);
+  const text = `Join "${room.value.name}" on HabitFlow!`;
+  return `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
 });
 
 async function copyInvite() {

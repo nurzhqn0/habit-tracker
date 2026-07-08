@@ -2,6 +2,10 @@
 // https://core.telegram.org/bots/webapps#initializing-mini-apps
 export interface TelegramWebApp {
   initData: string;
+  initDataUnsafe?: {
+    start_param?: string;
+    [key: string]: unknown;
+  };
   colorScheme: "light" | "dark";
   themeParams: Record<string, string>;
   isExpanded: boolean;
