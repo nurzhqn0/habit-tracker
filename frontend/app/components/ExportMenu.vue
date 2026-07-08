@@ -26,7 +26,7 @@ function runRange() {
 <template>
   <UPopover v-model:open="open">
     <UButton
-      icon="i-lucide-send"
+      icon="i-lucide-download"
       label="Export"
       color="neutral"
       variant="ghost"

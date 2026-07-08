@@ -128,14 +128,14 @@ async function onImportFile(event: Event) {
           <div class="flex flex-col gap-4">
             <div class="flex flex-wrap gap-2">
               <UButton
-                icon="i-lucide-send"
+                icon="i-lucide-download"
                 label="Export CSV (Loop format)"
                 variant="subtle"
                 :loading="sending"
                 @click="sendToTelegram('/export/csv')"
               />
               <UButton
-                icon="i-lucide-send"
+                icon="i-lucide-download"
                 label="Export Excel"
                 variant="subtle"
                 :loading="sending"
