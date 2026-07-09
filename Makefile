@@ -1,4 +1,4 @@
-.PHONY: dev api web bot migrate test lint up down backup
+.PHONY: dev api web bot migrate test lint up down backup dev-up dev-down dev-logs
 
 backup:
 	sh scripts/backup.sh
@@ -26,3 +26,14 @@ up:
 
 down:
 	docker compose down
+
+# Dev: backend (api + bot-optional) in Docker with hot reload; run `make web` in
+# another terminal for the frontend at http://localhost:3000.
+dev-up:
+	docker compose -f docker-compose.dev.yml up --build -d
+
+dev-down:
+	docker compose -f docker-compose.dev.yml down
+
+dev-logs:
+	docker compose -f docker-compose.dev.yml logs -f

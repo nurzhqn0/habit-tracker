@@ -1,0 +1,55 @@
+# Dev stack: backend (api + bot) in Docker, frontend runs on the host via
+# `npm run dev` for instant hot reload at http://localhost:3000.
+#
+#   docker compose -f docker-compose.dev.yml up --build   # start api + bot
+#   cd frontend && npm run dev                             # start frontend (host)
+#
+# The frontend's default API base is http://localhost:8000/api/v1, which the api
+# service below exposes. No nginx, no frontend container.
+name: habitflow-dev
+services:
+  api:
+    build: ./backend
+    # --reload picks up edits to the mounted ./backend/app on the fly.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: sqlite+aiosqlite:////srv/app/data/habitflow.db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production-0000}
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      BOT_USERNAME: ${BOT_USERNAME:-}
+      TG_CLIENT_ID: ${TG_CLIENT_ID:-}
+      TG_CLIENT_SECRET: ${TG_CLIENT_SECRET:-}
+      FRONTEND_ORIGIN: http://localhost:3000
+      # Enables POST /auth/test-login → the frontend "Dev login" button.
+      TEST_MODE: "true"
+    volumes:
+      - ./backend/app:/srv/app/app
+      - ./backend/alembic:/srv/app/alembic
+      - sqlite-dev-data:/srv/app/data
+    restart: unless-stopped
+
+  bot:
+    build: ./backend
+    # Opt-in: `docker compose -f docker-compose.dev.yml --profile bot up`.
+    # Skipped by default so dev works without a BOT_TOKEN.
+    profiles: ["bot"]
+    command: python -m app.workers.bot.main
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: sqlite+aiosqlite:////srv/app/data/habitflow.db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production-0000}
+      BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in .env}
+      BOT_USERNAME: ${BOT_USERNAME:-}
+      FRONTEND_ORIGIN: http://localhost:3000
+    volumes:
+      - ./backend/app:/srv/app/app
+      - sqlite-dev-data:/srv/app/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  sqlite-dev-data:
