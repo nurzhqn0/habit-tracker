@@ -16,6 +16,8 @@ ADMIN_ROUTES = [
     f"/admin/users/1?from={date.today()}&to={date.today()}",
     "/admin/rooms",
     "/admin/rooms/1",
+    "/admin/users/1/habits/1",
+    "/admin/users/1/habits/1/stats/overview",
 ]
 
 
@@ -82,6 +84,33 @@ async def test_admin_lists_users_and_user_detail(client, admin_enabled):
 
     response = await client.get(
         f"/admin/users/999999?from={today}&to={today}", headers=bearer(admin_tokens)
+    )
+    assert response.status_code == 404
+
+
+async def test_admin_user_habit_detail_and_stats(client, admin_enabled):
+    admin_tokens = await login(client, ADMIN_TG_ID)
+    other_tokens = await login(client, OTHER_TG_ID)
+    habit = (
+        await client.post("/habits", json={"name": "Read"}, headers=bearer(other_tokens))
+    ).json()
+    users = (await client.get("/admin/users", headers=bearer(admin_tokens))).json()
+    other_id = next(u["id"] for u in users if u["username"] == f"alice{OTHER_TG_ID}")
+
+    base = f"/admin/users/{other_id}/habits/{habit['id']}"
+    response = await client.get(base, headers=bearer(admin_tokens))
+    assert response.status_code == 200
+    assert response.json()["name"] == "Read"
+
+    response = await client.get(f"{base}/stats/overview", headers=bearer(admin_tokens))
+    assert response.status_code == 200
+
+    response = await client.get(f"{base}/stats/scores", headers=bearer(admin_tokens))
+    assert response.status_code == 200
+
+    # Habit belonging to a different user than the one in the path -> 404.
+    response = await client.get(
+        f"/admin/users/999999/habits/{habit['id']}", headers=bearer(admin_tokens)
     )
     assert response.status_code == 404
 

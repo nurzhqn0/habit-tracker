@@ -173,7 +173,10 @@ watch(period, () => {
             <div
               class="bg-default sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch"
             >
-              <div class="flex min-w-28 flex-1 items-center gap-3 sm:min-w-40">
+              <NuxtLink
+                :to="`/app/admin/users/${userId}/habits/${item.habit.id}`"
+                class="flex min-w-28 flex-1 items-center gap-3 sm:min-w-40"
+              >
                 <HabitScoreRing
                   :score="item.score"
                   :color="paletteColor(item.habit.color)"
@@ -195,7 +198,7 @@ watch(period, () => {
                     days
                   </p>
                 </div>
-              </div>
+              </NuxtLink>
             </div>
 
             <template v-for="date in days" :key="date">
