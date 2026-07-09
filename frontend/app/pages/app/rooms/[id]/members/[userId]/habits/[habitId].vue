@@ -23,7 +23,9 @@ const bars = ref<{ date: string; value: number }[]>([]);
 const weekdays = ref<{ weekday: number; value: number }[]>([]);
 const frequencyMonths = ref<{ month: string; weekdays: number[] }[]>([]);
 const streaks = ref<{ start: string; end: string; length: number }[]>([]);
-const targetRows = ref<{ period: string; actual: number; target: number }[]>([]);
+const targetRows = ref<{ period: string; actual: number; target: number }[]>(
+  [],
+);
 const notes = ref<{ date: string; value: number; notes: string }[]>([]);
 
 const scoreBucket = ref<"day" | "week" | "month" | "quarter" | "year">("day");
@@ -33,7 +35,9 @@ const loading = ref(true);
 const color = computed(() => paletteColor(habit.value?.color ?? 8));
 
 const habitName = computed(
-  () => habit.value?.name ?? (view.viewedHabit?.id === habitId ? view.viewedHabit.name : null),
+  () =>
+    habit.value?.name ??
+    (view.viewedHabit?.id === habitId ? view.viewedHabit.name : null),
 );
 
 useHead({ title: computed(() => habitName.value ?? "Habit") });
@@ -64,17 +68,23 @@ async function loadAll() {
   loading.value = true;
   try {
     habit.value = await apiFetch<Habit>(base);
-    [overview.value, heatmap.value, weekdays.value, frequencyMonths.value, streaks.value, notes.value] =
-      await Promise.all([
-        apiFetch(`${base}/stats/overview`),
-        apiFetch(`${base}/stats/history`),
-        apiFetch(`${base}/stats/weekdays`),
-        apiFetch(`${base}/stats/frequency`),
-        apiFetch(`${base}/stats/streaks`),
-        apiFetch(`${base}/stats/notes`),
-        loadScores(),
-        loadBars(),
-      ]);
+    [
+      overview.value,
+      heatmap.value,
+      weekdays.value,
+      frequencyMonths.value,
+      streaks.value,
+      notes.value,
+    ] = await Promise.all([
+      apiFetch(`${base}/stats/overview`),
+      apiFetch(`${base}/stats/history`),
+      apiFetch(`${base}/stats/weekdays`),
+      apiFetch(`${base}/stats/frequency`),
+      apiFetch(`${base}/stats/streaks`),
+      apiFetch(`${base}/stats/notes`),
+      loadScores(),
+      loadBars(),
+    ]);
     if (habit.value?.type === 1) {
       targetRows.value = await apiFetch(`${base}/stats/target`);
     }
@@ -98,7 +108,13 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
     <template #header>
       <UDashboardNavbar :toggle="false">
         <template #leading>
-          <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" :to="backTo" aria-label="Back" />
+          <UButton
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            :to="backTo"
+            aria-label="Back"
+          />
         </template>
         <template #title>
           <span v-if="habitName">{{ habitName }}</span>
@@ -109,16 +125,27 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 
     <template #body>
       <div v-if="loading" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="text-muted size-6 animate-spin"
+        />
       </div>
 
-      <div v-else-if="habit" class="mx-auto flex w-full max-w-4xl flex-col gap-4">
-        <div class="flex flex-wrap items-center gap-2 text-sm text-muted">
-          <UBadge :style="{ backgroundColor: color }" class="text-white">{{ frequencyLabel }}</UBadge>
+      <div
+        v-else-if="habit"
+        class="mx-auto flex w-full max-w-4xl flex-col gap-4"
+      >
+        <div class="text-muted flex flex-wrap items-center gap-2 text-sm">
+          <UBadge :style="{ backgroundColor: color }" class="text-white">{{
+            frequencyLabel
+          }}</UBadge>
           <UBadge v-if="habit.type === 1" variant="subtle">
-            {{ habit.target_type === 0 ? "At least" : "At most" }} {{ habit.target_value }} {{ habit.unit }}
+            {{ habit.target_type === 0 ? "At least" : "At most" }}
+            {{ habit.target_value }} {{ habit.unit }}
           </UBadge>
-          <span v-if="habit.question" class="italic">“{{ habit.question }}”</span>
+          <span v-if="habit.question" class="italic"
+            >“{{ habit.question }}”</span
+          >
         </div>
 
         <ChartsOverviewCard v-if="overview" :stats="overview" :color="color" />
@@ -126,8 +153,13 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
         <UCard>
           <template #header>
             <div class="flex items-center justify-between">
-              <p class="font-semibold text-highlighted">Score</p>
-              <USelect v-model="scoreBucket" :items="BUCKETS" size="sm" class="w-28" />
+              <p class="text-highlighted font-semibold">Score</p>
+              <USelect
+                v-model="scoreBucket"
+                :items="BUCKETS"
+                size="sm"
+                class="w-28"
+              />
             </div>
           </template>
           <ChartsScoreChart :points="scorePoints" :color="color" />
@@ -135,7 +167,7 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 
         <UCard>
           <template #header>
-            <p class="font-semibold text-highlighted">History</p>
+            <p class="text-highlighted font-semibold">History</p>
           </template>
           <ChartsHistoryHeatmap v-if="heatmap" :data="heatmap" :color="color" />
         </UCard>
@@ -144,16 +176,28 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
           <UCard>
             <template #header>
               <div class="flex items-center justify-between">
-                <p class="font-semibold text-highlighted">{{ habit.type === 1 ? "Totals" : "Completions" }}</p>
-                <USelect v-model="barBucket" :items="BUCKETS.slice(1)" size="sm" class="w-28" />
+                <p class="text-highlighted font-semibold">
+                  {{ habit.type === 1 ? "Totals" : "Completions" }}
+                </p>
+                <USelect
+                  v-model="barBucket"
+                  :items="BUCKETS.slice(1)"
+                  size="sm"
+                  class="w-28"
+                />
               </div>
             </template>
-            <ChartsBarChart :bars="bars" :color="color" :is-numerical="habit.type === 1" :unit="habit.unit" />
+            <ChartsBarChart
+              :bars="bars"
+              :color="color"
+              :is-numerical="habit.type === 1"
+              :unit="habit.unit"
+            />
           </UCard>
 
           <UCard>
             <template #header>
-              <p class="font-semibold text-highlighted">Best days</p>
+              <p class="text-highlighted font-semibold">Best days</p>
             </template>
             <ChartsWeekdayChart :weekdays="weekdays" :color="color" />
           </UCard>
@@ -161,7 +205,7 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 
         <UCard>
           <template #header>
-            <p class="font-semibold text-highlighted">Frequency</p>
+            <p class="text-highlighted font-semibold">Frequency</p>
           </template>
           <ChartsFrequencyChart
             :months="frequencyMonths"
@@ -172,31 +216,43 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 
         <UCard v-if="habit.type === 1">
           <template #header>
-            <p class="font-semibold text-highlighted">Target</p>
+            <p class="text-highlighted font-semibold">Target</p>
           </template>
-          <ChartsTargetCard :rows="targetRows" :color="color" :unit="habit.unit" />
+          <ChartsTargetCard
+            :rows="targetRows"
+            :color="color"
+            :unit="habit.unit"
+          />
         </UCard>
 
         <UCard>
           <template #header>
-            <p class="font-semibold text-highlighted">Best streaks</p>
+            <p class="text-highlighted font-semibold">Best streaks</p>
           </template>
           <ChartsStreakChart :streaks="streaks" :color="color" />
         </UCard>
 
         <UCard v-if="notes.length">
           <template #header>
-            <p class="font-semibold text-highlighted">Notes</p>
+            <p class="text-highlighted font-semibold">Notes</p>
           </template>
           <ul class="flex flex-col gap-2">
-            <li v-for="note in notes" :key="note.date" class="flex gap-3 text-sm">
-              <span class="shrink-0 tabular-nums text-dimmed">{{ note.date }}</span>
+            <li
+              v-for="note in notes"
+              :key="note.date"
+              class="flex gap-3 text-sm"
+            >
+              <span class="text-dimmed shrink-0 tabular-nums">{{
+                note.date
+              }}</span>
               <span class="text-default">{{ note.notes }}</span>
             </li>
           </ul>
         </UCard>
 
-        <p v-if="habit.description" class="px-1 text-sm text-muted">{{ habit.description }}</p>
+        <p v-if="habit.description" class="text-muted px-1 text-sm">
+          {{ habit.description }}
+        </p>
       </div>
     </template>
   </UDashboardPanel>

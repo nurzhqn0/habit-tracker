@@ -4,7 +4,12 @@ import type { DropdownMenuItem } from "@nuxt/ui";
 import type { Habit, HabitOverviewItem } from "~~/shared/types/habits";
 import { apiFetch } from "~/services/api/client";
 import type { Preferences } from "~~/shared/types/api";
-import { lastNDateKeys, todayKey, weekdayShort, dayOfMonth } from "~/composables/useDates";
+import {
+  lastNDateKeys,
+  todayKey,
+  weekdayShort,
+  dayOfMonth,
+} from "~/composables/useDates";
 import { paletteColor } from "~/composables/usePalette";
 
 definePageMeta({ layout: "dashboard" });
@@ -33,7 +38,6 @@ async function confirmDelete() {
   deleting.value = null;
   try {
     await store.deleteHabit(habit.id);
-    toast.add({ title: `Deleted "${habit.name}"`, color: "neutral" });
   } catch {
     toast.add({ title: "Could not delete habit", color: "error" });
   }
@@ -45,12 +49,18 @@ async function load() {
 }
 
 onMounted(async () => {
-  prefs.value = await apiFetch<Preferences>("/me/preferences").catch(() => null);
-  await load().catch(() => toast.add({ title: "Could not load habits", color: "error" }));
+  prefs.value = await apiFetch<Preferences>("/me/preferences").catch(
+    () => null,
+  );
+  await load().catch(() =>
+    toast.add({ title: "Could not load habits", color: "error" }),
+  );
 });
 
 watch(period, () => {
-  load().catch(() => toast.add({ title: "Could not load habits", color: "error" }));
+  load().catch(() =>
+    toast.add({ title: "Could not load habits", color: "error" }),
+  );
 });
 
 const sortItems = computed<DropdownMenuItem[]>(() =>
@@ -82,7 +92,11 @@ async function onToggle(item: HabitOverviewItem, date: string) {
   }
 }
 
-async function onSetValue(item: HabitOverviewItem, date: string, value: number) {
+async function onSetValue(
+  item: HabitOverviewItem,
+  date: string,
+  value: number,
+) {
   try {
     await store.setValue(item.habit.id, date, value);
   } catch {
@@ -91,8 +105,8 @@ async function onSetValue(item: HabitOverviewItem, date: string, value: number) 
 }
 
 function openCreate() {
-  editing.value = undefined;
   formOpen.value = true;
+  editing.value = undefined;
 }
 
 function openEdit(habit: Habit) {
@@ -104,8 +118,16 @@ function rowMenu(item: HabitOverviewItem): DropdownMenuItem[][] {
   const habit = item.habit;
   return [
     [
-      { label: "Details", icon: "i-lucide-chart-line", to: `/app/habits/${habit.id}` },
-      { label: "Edit", icon: "i-lucide-pencil", onSelect: () => openEdit(habit) },
+      {
+        label: "Details",
+        icon: "i-lucide-chart-line",
+        to: `/app/habits/${habit.id}`,
+      },
+      {
+        label: "Edit",
+        icon: "i-lucide-pencil",
+        onSelect: () => openEdit(habit),
+      },
     ],
     [
       {
@@ -138,46 +160,81 @@ async function onDragEnd() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <USelect v-model="period" :items="periodItems" size="sm" class="w-24" aria-label="Period" />
+          <USelect
+            v-model="period"
+            :items="periodItems"
+            size="sm"
+            class="w-24"
+            aria-label="Period"
+          />
           <ExportMenu path="/export/report/xlsx" />
           <UDropdownMenu :items="sortItems">
-            <UButton icon="i-lucide-arrow-up-down" color="neutral" variant="ghost" aria-label="Sort" />
+            <UButton
+              icon="i-lucide-arrow-up-down"
+              color="neutral"
+              variant="ghost"
+              aria-label="Sort"
+            />
           </UDropdownMenu>
-          <UButton icon="i-lucide-plus" label="New habit" class="hidden sm:inline-flex" @click="openCreate" />
-          <UButton icon="i-lucide-plus" aria-label="New habit" class="sm:hidden" @click="openCreate" />
+          <UButton
+            icon="i-lucide-plus"
+            label="New habit"
+            class="hidden sm:inline-flex"
+            @click="openCreate"
+          />
+          <UButton
+            icon="i-lucide-plus"
+            aria-label="New habit"
+            class="sm:hidden"
+            @click="openCreate"
+          />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
       <div v-if="store.loading" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="text-muted size-6 animate-spin"
+        />
       </div>
 
       <div
         v-else-if="store.items.length === 0"
         class="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center"
       >
-        <UIcon name="i-lucide-sprout" class="size-10 text-muted" />
-        <p class="text-lg font-semibold text-highlighted">No habits yet</p>
-        <p class="text-sm text-muted">Create your first habit and start building streaks.</p>
-        <UButton icon="i-lucide-plus" label="Create habit" @click="openCreate" />
+        <UIcon name="i-lucide-sprout" class="text-muted size-10" />
+        <p class="text-highlighted text-lg font-semibold">No habits yet</p>
+        <p class="text-muted text-sm">
+          Create your first habit and start building streaks.
+        </p>
+        <UButton
+          icon="i-lucide-plus"
+          label="Create habit"
+          @click="openCreate"
+        />
       </div>
 
       <div v-else class="min-w-fit">
         <div>
-          <div class="flex items-center gap-2 border-b border-default pb-2">
-            <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
+          <div class="border-default flex items-center gap-2 border-b pb-2">
+            <div
+              class="bg-default sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch"
+            >
               <div class="w-6 shrink-0" />
               <div class="min-w-28 flex-1 sm:min-w-40" />
             </div>
             <div
               v-for="date in days"
               :key="date"
-              class="w-9 text-center text-[10px] uppercase leading-tight text-muted"
+              class="text-muted w-9 text-center text-[10px] leading-tight uppercase"
             >
               <div>{{ weekdayShort(date) }}</div>
-              <div class="font-semibold" :class="date === today ? 'text-primary' : ''">
+              <div
+                class="font-semibold"
+                :class="date === today ? 'text-primary' : ''"
+              >
                 {{ dayOfMonth(date) }}
               </div>
             </div>
@@ -194,12 +251,14 @@ async function onDragEnd() {
             <template #item="{ element: item }">
               <div
                 data-testid="habit-row"
-                class="flex items-center gap-2 border-b border-default py-1"
+                class="border-default flex items-center gap-2 border-b py-1"
               >
-                <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
+                <div
+                  class="bg-default sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch"
+                >
                   <UIcon
                     name="i-lucide-grip-vertical"
-                    class="drag-handle w-6 shrink-0 text-dimmed"
+                    class="drag-handle text-dimmed w-6 shrink-0"
                     :class="dragEnabled ? 'cursor-grab' : 'opacity-20'"
                   />
 
@@ -207,7 +266,10 @@ async function onDragEnd() {
                     :to="`/app/habits/${item.habit.id}`"
                     class="flex min-w-28 flex-1 items-center gap-3 sm:min-w-40"
                   >
-                    <HabitScoreRing :score="item.score" :color="paletteColor(item.habit.color)" />
+                    <HabitScoreRing
+                      :score="item.score"
+                      :color="paletteColor(item.habit.color)"
+                    />
                     <div class="min-w-0">
                       <p
                         class="truncate text-sm font-medium"
@@ -215,8 +277,14 @@ async function onDragEnd() {
                       >
                         {{ item.habit.name }}
                       </p>
-                      <p v-if="item.streak > 1" class="flex items-center gap-1 text-xs text-muted">
-                        <UIcon name="i-lucide-flame" class="size-3" />{{ item.streak }} days
+                      <p
+                        v-if="item.streak > 1"
+                        class="text-muted flex items-center gap-1 text-xs"
+                      >
+                        <UIcon name="i-lucide-flame" class="size-3" />{{
+                          item.streak
+                        }}
+                        days
                       </p>
                     </div>
                   </NuxtLink>
@@ -263,12 +331,30 @@ async function onDragEnd() {
         :open="deleting !== null"
         :title="`Delete “${deleting?.name}”?`"
         description="All its entries will be removed. This cannot be undone."
-        @update:open="(open: boolean) => { if (!open) deleting = null; }"
+        @update:open="
+          (open: boolean) => {
+            if (!open) deleting = null;
+          }
+        "
       >
         <template #footer>
           <div class="flex w-full justify-end gap-2">
-            <UButton label="Cancel" color="neutral" variant="ghost" @click="deleting = null" />
-            <UButton label="Delete" color="error" icon="i-lucide-trash-2" @click="confirmDelete" />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              @click="
+                () => {
+                  deleting = null;
+                }
+              "
+            />
+            <UButton
+              label="Delete"
+              color="error"
+              icon="i-lucide-trash-2"
+              @click="confirmDelete"
+            />
           </div>
         </template>
       </UModal>

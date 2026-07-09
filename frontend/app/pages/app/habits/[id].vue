@@ -19,7 +19,9 @@ const bars = ref<{ date: string; value: number }[]>([]);
 const weekdays = ref<{ weekday: number; value: number }[]>([]);
 const frequencyMonths = ref<{ month: string; weekdays: number[] }[]>([]);
 const streaks = ref<{ start: string; end: string; length: number }[]>([]);
-const targetRows = ref<{ period: string; actual: number; target: number }[]>([]);
+const targetRows = ref<{ period: string; actual: number; target: number }[]>(
+  [],
+);
 const notes = ref<{ date: string; value: number; notes: string }[]>([]);
 
 const scoreBucket = ref<"day" | "week" | "month" | "quarter" | "year">("day");
@@ -31,7 +33,8 @@ const color = computed(() => paletteColor(habit.value?.color ?? 8));
 
 // The habits store usually already holds the habit when navigating from the
 // grid — use its name until the fetch resolves to avoid a "Habit" title flash.
-const cachedName = store.items.find((i) => i.habit.id === habitId)?.habit.name ?? null;
+const cachedName =
+  store.items.find((i) => i.habit.id === habitId)?.habit.name ?? null;
 const title = computed(() => habit.value?.name ?? cachedName ?? "Habit");
 
 useHead({ title });
@@ -62,17 +65,23 @@ async function loadAll(silent = false) {
   if (!silent) loading.value = true;
   try {
     habit.value = await apiFetch<Habit>(`/habits/${habitId}`);
-    [overview.value, heatmap.value, weekdays.value, frequencyMonths.value, streaks.value, notes.value] =
-      await Promise.all([
-        apiFetch(`/habits/${habitId}/stats/overview`),
-        apiFetch(`/habits/${habitId}/stats/history`),
-        apiFetch(`/habits/${habitId}/stats/weekdays`),
-        apiFetch(`/habits/${habitId}/stats/frequency`),
-        apiFetch(`/habits/${habitId}/stats/streaks`),
-        apiFetch(`/habits/${habitId}/stats/notes`),
-        loadScores(),
-        loadBars(),
-      ]);
+    [
+      overview.value,
+      heatmap.value,
+      weekdays.value,
+      frequencyMonths.value,
+      streaks.value,
+      notes.value,
+    ] = await Promise.all([
+      apiFetch(`/habits/${habitId}/stats/overview`),
+      apiFetch(`/habits/${habitId}/stats/history`),
+      apiFetch(`/habits/${habitId}/stats/weekdays`),
+      apiFetch(`/habits/${habitId}/stats/frequency`),
+      apiFetch(`/habits/${habitId}/stats/streaks`),
+      apiFetch(`/habits/${habitId}/stats/notes`),
+      loadScores(),
+      loadBars(),
+    ]);
     if (habit.value?.type === 1) {
       targetRows.value = await apiFetch(`/habits/${habitId}/stats/target`);
     }
@@ -95,12 +104,15 @@ async function onPickDay(date: string) {
   if (!habit.value) return;
   if (habit.value.type === 1) {
     const stored = heatmap.value?.entries?.[date];
-    valueInput.value = stored !== undefined && stored >= 0 ? String(stored / 1000) : "";
+    valueInput.value =
+      stored !== undefined && stored >= 0 ? String(stored / 1000) : "";
     valueDate.value = date;
     return;
   }
   try {
-    await apiFetch(`/habits/${habitId}/entries/${date}/toggle`, { method: "POST" });
+    await apiFetch(`/habits/${habitId}/entries/${date}/toggle`, {
+      method: "POST",
+    });
     await loadAll(true);
   } catch {
     toast.add({ title: "Could not save entry", color: "error" });
@@ -140,30 +152,73 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
     <template #header>
       <UDashboardNavbar :title="title" :toggle="false">
         <template #leading>
-          <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app" aria-label="Back" />
+          <UButton
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            to="/app"
+            aria-label="Back"
+          />
         </template>
         <template #right>
-          <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" label="Edit" @click="editOpen = true" />
-          <UButton icon="i-lucide-trash-2" color="error" variant="ghost" aria-label="Delete" @click="deleteOpen = true" />
+          <UButton
+            icon="i-lucide-pencil"
+            color="neutral"
+            variant="ghost"
+            label="Edit"
+            @click="
+              () => {
+                editOpen = true;
+              }
+            "
+          />
+          <UButton
+            icon="i-lucide-trash-2"
+            color="error"
+            variant="ghost"
+            aria-label="Delete"
+            @click="
+              () => {
+                deleteOpen = true;
+              }
+            "
+          />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
       <div v-if="loading" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="text-muted size-6 animate-spin"
+        />
       </div>
 
-      <div v-else-if="habit" class="mx-auto flex w-full max-w-4xl flex-col gap-4">
-        <div class="flex flex-wrap items-center gap-2 text-sm text-muted">
-          <UBadge :style="{ backgroundColor: color }" class="text-white">{{ frequencyLabel }}</UBadge>
+      <div
+        v-else-if="habit"
+        class="mx-auto flex w-full max-w-4xl flex-col gap-4"
+      >
+        <div class="text-muted flex flex-wrap items-center gap-2 text-sm">
+          <UBadge :style="{ backgroundColor: color }" class="text-white">{{
+            frequencyLabel
+          }}</UBadge>
           <UBadge v-if="habit.type === 1" variant="subtle">
-            {{ habit.target_type === 0 ? "At least" : "At most" }} {{ habit.target_value }} {{ habit.unit }}
+            {{ habit.target_type === 0 ? "At least" : "At most" }}
+            {{ habit.target_value }} {{ habit.unit }}
           </UBadge>
-          <UBadge v-if="habit.reminder_hour !== null" variant="subtle" icon="i-lucide-bell">
-            {{ String(habit.reminder_hour).padStart(2, "0") }}:{{ String(habit.reminder_min ?? 0).padStart(2, "0") }}
+          <UBadge
+            v-if="habit.reminder_hour !== null"
+            variant="subtle"
+            icon="i-lucide-bell"
+          >
+            {{ String(habit.reminder_hour).padStart(2, "0") }}:{{
+              String(habit.reminder_min ?? 0).padStart(2, "0")
+            }}
           </UBadge>
-          <span v-if="habit.question" class="italic">“{{ habit.question }}”</span>
+          <span v-if="habit.question" class="italic"
+            >“{{ habit.question }}”</span
+          >
         </div>
 
         <ChartsOverviewCard v-if="overview" :stats="overview" :color="color" />
@@ -171,8 +226,13 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
         <UCard>
           <template #header>
             <div class="flex items-center justify-between">
-              <p class="font-semibold text-highlighted">Score</p>
-              <USelect v-model="scoreBucket" :items="BUCKETS" size="sm" class="w-28" />
+              <p class="text-highlighted font-semibold">Score</p>
+              <USelect
+                v-model="scoreBucket"
+                :items="BUCKETS"
+                size="sm"
+                class="w-28"
+              />
             </div>
           </template>
           <ChartsScoreChart :points="scorePoints" :color="color" />
@@ -181,29 +241,50 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
         <UCard>
           <template #header>
             <div class="flex items-center justify-between gap-2">
-              <p class="font-semibold text-highlighted">History</p>
-              <p class="text-xs text-muted">
-                {{ habit.type === 1 ? "Tap a day to edit its value" : "Tap a day to toggle" }}
+              <p class="text-highlighted font-semibold">History</p>
+              <p class="text-muted text-xs">
+                {{
+                  habit.type === 1
+                    ? "Tap a day to edit its value"
+                    : "Tap a day to toggle"
+                }}
               </p>
             </div>
           </template>
-          <ChartsHistoryHeatmap v-if="heatmap" :data="heatmap" :color="color" @pick="onPickDay" />
+          <ChartsHistoryHeatmap
+            v-if="heatmap"
+            :data="heatmap"
+            :color="color"
+            @pick="onPickDay"
+          />
         </UCard>
 
         <div class="grid gap-4 lg:grid-cols-2">
           <UCard>
             <template #header>
               <div class="flex items-center justify-between">
-                <p class="font-semibold text-highlighted">{{ habit.type === 1 ? "Totals" : "Completions" }}</p>
-                <USelect v-model="barBucket" :items="BUCKETS.slice(1)" size="sm" class="w-28" />
+                <p class="text-highlighted font-semibold">
+                  {{ habit.type === 1 ? "Totals" : "Completions" }}
+                </p>
+                <USelect
+                  v-model="barBucket"
+                  :items="BUCKETS.slice(1)"
+                  size="sm"
+                  class="w-28"
+                />
               </div>
             </template>
-            <ChartsBarChart :bars="bars" :color="color" :is-numerical="habit.type === 1" :unit="habit.unit" />
+            <ChartsBarChart
+              :bars="bars"
+              :color="color"
+              :is-numerical="habit.type === 1"
+              :unit="habit.unit"
+            />
           </UCard>
 
           <UCard>
             <template #header>
-              <p class="font-semibold text-highlighted">Best days</p>
+              <p class="text-highlighted font-semibold">Best days</p>
             </template>
             <ChartsWeekdayChart :weekdays="weekdays" :color="color" />
           </UCard>
@@ -211,7 +292,7 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 
         <UCard>
           <template #header>
-            <p class="font-semibold text-highlighted">Frequency</p>
+            <p class="text-highlighted font-semibold">Frequency</p>
           </template>
           <ChartsFrequencyChart
             :months="frequencyMonths"
@@ -222,40 +303,60 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
 
         <UCard v-if="habit.type === 1">
           <template #header>
-            <p class="font-semibold text-highlighted">Target</p>
+            <p class="text-highlighted font-semibold">Target</p>
           </template>
-          <ChartsTargetCard :rows="targetRows" :color="color" :unit="habit.unit" />
+          <ChartsTargetCard
+            :rows="targetRows"
+            :color="color"
+            :unit="habit.unit"
+          />
         </UCard>
 
         <UCard>
           <template #header>
-            <p class="font-semibold text-highlighted">Best streaks</p>
+            <p class="text-highlighted font-semibold">Best streaks</p>
           </template>
           <ChartsStreakChart :streaks="streaks" :color="color" />
         </UCard>
 
         <UCard v-if="notes.length">
           <template #header>
-            <p class="font-semibold text-highlighted">Notes</p>
+            <p class="text-highlighted font-semibold">Notes</p>
           </template>
           <ul class="flex flex-col gap-2">
-            <li v-for="note in notes" :key="note.date" class="flex gap-3 text-sm">
-              <span class="shrink-0 tabular-nums text-dimmed">{{ note.date }}</span>
+            <li
+              v-for="note in notes"
+              :key="note.date"
+              class="flex gap-3 text-sm"
+            >
+              <span class="text-dimmed shrink-0 tabular-nums">{{
+                note.date
+              }}</span>
               <span class="text-default">{{ note.notes }}</span>
             </li>
           </ul>
         </UCard>
 
-        <p v-if="habit.description" class="px-1 text-sm text-muted">{{ habit.description }}</p>
+        <p v-if="habit.description" class="text-muted px-1 text-sm">
+          {{ habit.description }}
+        </p>
       </div>
 
-      <HabitFormModal v-model:open="editOpen" :habit="habit ?? undefined" @saved="loadAll" />
+      <HabitFormModal
+        v-model:open="editOpen"
+        :habit="habit ?? undefined"
+        @saved="loadAll"
+      />
 
       <UModal
         :open="valueDate !== null"
         :title="valueDate ?? ''"
         description="Set the value for this day."
-        @update:open="(open: boolean) => { if (!open) valueDate = null; }"
+        @update:open="
+          (open: boolean) => {
+            if (!open) valueDate = null;
+          }
+        "
       >
         <template #body>
           <form class="flex items-center gap-2" @submit.prevent="saveValue">
@@ -268,7 +369,9 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
               :placeholder="`0 ${habit?.unit ?? ''}`"
               class="flex-1"
             />
-            <span v-if="habit?.unit" class="text-xs text-muted">{{ habit.unit }}</span>
+            <span v-if="habit?.unit" class="text-muted text-xs">{{
+              habit.unit
+            }}</span>
             <UButton type="submit" icon="i-lucide-check" label="Save" />
           </form>
         </template>
@@ -281,8 +384,22 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"];
       >
         <template #footer>
           <div class="flex w-full justify-end gap-2">
-            <UButton label="Cancel" color="neutral" variant="ghost" @click="deleteOpen = false" />
-            <UButton label="Delete" color="error" icon="i-lucide-trash-2" @click="onDelete" />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              @click="
+                () => {
+                  deleteOpen = true;
+                }
+              "
+            />
+            <UButton
+              label="Delete"
+              color="error"
+              icon="i-lucide-trash-2"
+              @click="onDelete"
+            />
           </div>
         </template>
       </UModal>

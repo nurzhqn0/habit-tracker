@@ -36,7 +36,10 @@ async function createRoom() {
   if (!newRoom.name.trim()) return;
   busy.value = true;
   try {
-    const room = await apiFetch<Room>("/rooms", { method: "POST", body: { ...newRoom } });
+    const room = await apiFetch<Room>("/rooms", {
+      method: "POST",
+      body: { ...newRoom },
+    });
     createOpen.value = false;
     newRoom.name = "";
     newRoom.description = "";
@@ -75,30 +78,67 @@ async function joinRoom() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <UButton icon="i-lucide-log-in" label="Join" variant="subtle" @click="joinOpen = true" />
-          <UButton icon="i-lucide-plus" label="New room" @click="createOpen = true" />
+          <UButton
+            icon="i-lucide-log-in"
+            label="Join"
+            variant="subtle"
+            @click="
+              () => {
+                joinOpen = true;
+              }
+            "
+          />
+          <UButton
+            icon="i-lucide-plus"
+            label="New room"
+            @click="
+              () => {
+                createOpen = true;
+              }
+            "
+          />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
       <div v-if="loading" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="text-muted size-6 animate-spin"
+        />
       </div>
 
       <div
         v-else-if="rooms.length === 0"
         class="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center"
       >
-        <UIcon name="i-lucide-users" class="size-10 text-muted" />
-        <p class="text-lg font-semibold text-highlighted">No rooms yet</p>
-        <p class="text-sm text-muted">
-          Rooms let you share habits with friends — everyone tracks their own progress and
-          competes on the leaderboard.
+        <UIcon name="i-lucide-users" class="text-muted size-10" />
+        <p class="text-highlighted text-lg font-semibold">No rooms yet</p>
+        <p class="text-muted text-sm">
+          Rooms let you share habits with friends — everyone tracks their own
+          progress and competes on the leaderboard.
         </p>
         <div class="flex gap-2">
-          <UButton icon="i-lucide-plus" label="Create room" @click="createOpen = true" />
-          <UButton icon="i-lucide-log-in" label="Join with code" variant="subtle" @click="joinOpen = true" />
+          <UButton
+            icon="i-lucide-plus"
+            label="Create room"
+            @click="
+              () => {
+                createOpen = true;
+              }
+            "
+          />
+          <UButton
+            icon="i-lucide-log-in"
+            label="Join with code"
+            variant="subtle"
+            @click="
+              () => {
+                joinOpen = true;
+              }
+            "
+          />
         </div>
       </div>
 
@@ -109,14 +149,21 @@ async function joinRoom() {
           :to="`/app/rooms/${room.id}`"
           @click="view.viewedRoom = room"
         >
-          <UCard class="h-28 overflow-hidden transition hover:ring-2 hover:ring-primary sm:h-32">
+          <UCard
+            class="hover:ring-primary h-28 overflow-hidden transition hover:ring-2 sm:h-32"
+          >
             <div class="flex items-start gap-3">
-              <UIcon name="i-lucide-users" class="mt-1 size-5 shrink-0 text-primary" />
+              <UIcon
+                name="i-lucide-users"
+                class="text-primary mt-1 size-5 shrink-0"
+              />
               <div class="min-w-0">
-                <p class="truncate font-semibold text-highlighted">{{ room.name }}</p>
+                <p class="text-highlighted truncate font-semibold">
+                  {{ room.name }}
+                </p>
                 <p
                   v-if="room.description"
-                  class="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted"
+                  class="text-muted mt-1 line-clamp-2 text-sm whitespace-pre-line"
                 >
                   {{ room.description }}
                 </p>
@@ -130,17 +177,40 @@ async function joinRoom() {
         <template #body>
           <form class="flex flex-col gap-4" @submit.prevent="createRoom">
             <UFormField label="Name" required>
-              <UInput v-model="newRoom.name" placeholder="e.g. Morning Crew" class="w-full" autofocus />
+              <UInput
+                v-model="newRoom.name"
+                placeholder="e.g. Morning Crew"
+                class="w-full"
+                autofocus
+              />
             </UFormField>
             <UFormField label="Description">
-              <UTextarea v-model="newRoom.description" :rows="2" class="w-full" />
+              <UTextarea
+                v-model="newRoom.description"
+                :rows="2"
+                class="w-full"
+              />
             </UFormField>
           </form>
         </template>
         <template #footer>
           <div class="flex w-full justify-end gap-2">
-            <UButton color="neutral" variant="ghost" label="Cancel" @click="createOpen = false" />
-            <UButton :loading="busy" :disabled="!newRoom.name.trim()" label="Create" @click="createRoom" />
+            <UButton
+              color="neutral"
+              variant="ghost"
+              label="Cancel"
+              @click="
+                () => {
+                  createOpen = false;
+                }
+              "
+            />
+            <UButton
+              :loading="busy"
+              :disabled="!newRoom.name.trim()"
+              label="Create"
+              @click="createRoom"
+            />
           </div>
         </template>
       </UModal>
@@ -149,14 +219,33 @@ async function joinRoom() {
         <template #body>
           <form class="flex flex-col gap-4" @submit.prevent="joinRoom">
             <UFormField label="Invite code" required>
-              <UInput v-model="joinCode" placeholder="paste the code" class="w-full" autofocus />
+              <UInput
+                v-model="joinCode"
+                placeholder="paste the code"
+                class="w-full"
+                autofocus
+              />
             </UFormField>
           </form>
         </template>
         <template #footer>
           <div class="flex w-full justify-end gap-2">
-            <UButton color="neutral" variant="ghost" label="Cancel" @click="joinOpen = false" />
-            <UButton :loading="busy" :disabled="!joinCode.trim()" label="Join" @click="joinRoom" />
+            <UButton
+              color="neutral"
+              variant="ghost"
+              label="Cancel"
+              @click="
+                () => {
+                  joinOpen = false;
+                }
+              "
+            />
+            <UButton
+              :loading="busy"
+              :disabled="!joinCode.trim()"
+              label="Join"
+              @click="joinRoom"
+            />
           </div>
         </template>
       </UModal>

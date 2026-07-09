@@ -3,7 +3,12 @@ import type { HabitOverviewItem } from "~~/shared/types/habits";
 import type { RoomMember } from "~~/shared/types/rooms";
 import { apiFetch } from "~/services/api/client";
 import type { Preferences } from "~~/shared/types/api";
-import { lastNDateKeys, todayKey, weekdayShort, dayOfMonth } from "~/composables/useDates";
+import {
+  lastNDateKeys,
+  todayKey,
+  weekdayShort,
+  dayOfMonth,
+} from "~/composables/useDates";
 import { paletteColor } from "~/composables/usePalette";
 
 definePageMeta({ layout: "dashboard" });
@@ -31,18 +36,25 @@ const dayCount = computed(() => (period.value === "week" ? 7 : 31));
 const days = computed(() => lastNDateKeys(dayCount.value)); // newest first
 const today = todayKey();
 
-const title = computed(() => (member.value ? `${member.value.first_name} — habits` : "Member habits"));
+const title = computed(() =>
+  member.value ? `${member.value.first_name} — habits` : "Member habits",
+);
 useHead({ title });
 
 async function load() {
   const range = days.value;
-  items.value = await apiFetch<HabitOverviewItem[]>(`/rooms/${roomId}/members/${userId}/overview`, {
-    query: { from: range[range.length - 1], to: range[0] },
-  });
+  items.value = await apiFetch<HabitOverviewItem[]>(
+    `/rooms/${roomId}/members/${userId}/overview`,
+    {
+      query: { from: range[range.length - 1], to: range[0] },
+    },
+  );
 }
 
 onMounted(async () => {
-  prefs.value = await apiFetch<Preferences>("/me/preferences").catch(() => null);
+  prefs.value = await apiFetch<Preferences>("/me/preferences").catch(
+    () => null,
+  );
   try {
     if (!member.value) {
       const members = await apiFetch<RoomMember[]>(`/rooms/${roomId}/members`);
@@ -62,7 +74,9 @@ function openHabit(habit: HabitOverviewItem["habit"]) {
 }
 
 watch(period, () => {
-  load().catch(() => toast.add({ title: "Could not load habits", color: "error" }));
+  load().catch(() =>
+    toast.add({ title: "Could not load habits", color: "error" }),
+  );
 });
 </script>
 
@@ -91,40 +105,57 @@ watch(period, () => {
             size="sm"
           />
           <USkeleton v-else class="size-7 rounded-full" />
-          <USelect v-model="period" :items="periodItems" size="sm" class="w-24" aria-label="Period" />
+          <USelect
+            v-model="period"
+            :items="periodItems"
+            size="sm"
+            class="w-24"
+            aria-label="Period"
+          />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
       <div v-if="loading" class="flex justify-center py-16">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="text-muted size-6 animate-spin"
+        />
       </div>
 
       <div
         v-else-if="items.length === 0"
         class="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center"
       >
-        <UIcon name="i-lucide-sprout" class="size-10 text-muted" />
-        <p class="text-lg font-semibold text-highlighted">No habits linked to this room</p>
-        <p class="text-sm text-muted">
-          {{ member?.first_name ?? "This member" }} hasn't linked any habits here yet.
+        <UIcon name="i-lucide-sprout" class="text-muted size-10" />
+        <p class="text-highlighted text-lg font-semibold">
+          No habits linked to this room
+        </p>
+        <p class="text-muted text-sm">
+          {{ member?.first_name ?? "This member" }} hasn't linked any habits
+          here yet.
         </p>
       </div>
 
       <div v-else class="min-w-fit">
         <div>
-          <div class="flex items-center gap-2 border-b border-default pb-2">
-            <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
+          <div class="border-default flex items-center gap-2 border-b pb-2">
+            <div
+              class="bg-default sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch"
+            >
               <div class="min-w-28 flex-1 sm:min-w-40" />
             </div>
             <div
               v-for="date in days"
               :key="date"
-              class="w-9 text-center text-[10px] uppercase leading-tight text-muted"
+              class="text-muted w-9 text-center text-[10px] leading-tight uppercase"
             >
               <div>{{ weekdayShort(date) }}</div>
-              <div class="font-semibold" :class="date === today ? 'text-primary' : ''">
+              <div
+                class="font-semibold"
+                :class="date === today ? 'text-primary' : ''"
+              >
                 {{ dayOfMonth(date) }}
               </div>
             </div>
@@ -134,15 +165,20 @@ watch(period, () => {
             v-for="item in items"
             :key="item.habit.id"
             data-testid="member-habit-row"
-            class="flex items-center gap-2 border-b border-default py-1"
+            class="border-default flex items-center gap-2 border-b py-1"
           >
-            <div class="sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch bg-default">
+            <div
+              class="bg-default sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch"
+            >
               <NuxtLink
                 :to="`/app/rooms/${roomId}/members/${userId}/habits/${item.habit.id}`"
                 class="flex min-w-28 flex-1 items-center gap-3 sm:min-w-40"
                 @click="openHabit(item.habit)"
               >
-                <HabitScoreRing :score="item.score" :color="paletteColor(item.habit.color)" />
+                <HabitScoreRing
+                  :score="item.score"
+                  :color="paletteColor(item.habit.color)"
+                />
                 <div class="min-w-0">
                   <p
                     class="truncate text-sm font-medium"
@@ -150,8 +186,14 @@ watch(period, () => {
                   >
                     {{ item.habit.name }}
                   </p>
-                  <p v-if="item.streak > 1" class="flex items-center gap-1 text-xs text-muted">
-                    <UIcon name="i-lucide-flame" class="size-3" />{{ item.streak }} days
+                  <p
+                    v-if="item.streak > 1"
+                    class="text-muted flex items-center gap-1 text-xs"
+                  >
+                    <UIcon name="i-lucide-flame" class="size-3" />{{
+                      item.streak
+                    }}
+                    days
                   </p>
                 </div>
               </NuxtLink>
