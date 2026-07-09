@@ -39,3 +39,16 @@ async def get_current_user(
 
 
 CurrentUserDep = Annotated[UserRow, Depends(get_current_user)]
+
+
+async def get_admin_user(user: CurrentUserDep, settings: SettingsDep) -> UserRow:
+    if (
+        not settings.admin_username
+        or user.username is None
+        or user.username.lower() != settings.admin_username
+    ):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+AdminUserDep = Annotated[UserRow, Depends(get_admin_user)]

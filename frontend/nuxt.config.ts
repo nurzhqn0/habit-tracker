@@ -35,6 +35,7 @@ export default defineNuxtConfig({
       apiBase: "http://localhost:8000/api/v1",
       botUsername: "",
       tgClientId: "", // BotFather -> Web Login -> Client ID
+      adminUsername: "", // NUXT_PUBLIC_ADMIN_USERNAME — UI gating only, backend enforces
     },
   },
 });

@@ -25,6 +25,10 @@ services:
       FRONTEND_ORIGIN: http://localhost:3000
       # Enables POST /auth/test-login → the frontend "Dev login" button.
       TEST_MODE: "true"
+      # Dev login user is "testuser" — set ADMIN_USERNAME=testuser (plus
+      # NUXT_PUBLIC_ADMIN_USERNAME=testuser for the host frontend) to see the
+      # admin UI locally.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
     volumes:
       - ./backend/app:/srv/app/app
       - ./backend/alembic:/srv/app/alembic

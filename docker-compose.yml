@@ -25,6 +25,7 @@ services:
       TG_CLIENT_ID: ${TG_CLIENT_ID:-}
       TG_CLIENT_SECRET: ${TG_CLIENT_SECRET:-}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
     volumes:
       - sqlite-data:/srv/app/data
     healthcheck:
@@ -59,6 +60,7 @@ services:
       NUXT_API_INTERNAL_BASE: http://api:8000/api/v1
       NUXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-}
       NUXT_PUBLIC_TG_CLIENT_ID: ${TG_CLIENT_ID:-}
+      NUXT_PUBLIC_ADMIN_USERNAME: ${ADMIN_USERNAME:-}
     restart: unless-stopped
 
 volumes:

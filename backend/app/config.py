@@ -22,10 +22,17 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
     test_mode: bool = False
 
+    admin_username: str = ""  # Telegram username of the platform admin, without @
+
     @field_validator("frontend_origin")
     @classmethod
     def _strip_trailing_slash(cls, v: str) -> str:
         return v.rstrip("/")
+
+    @field_validator("admin_username")
+    @classmethod
+    def _normalize_admin_username(cls, v: str) -> str:
+        return v.lstrip("@").lower()
 
 
 @lru_cache

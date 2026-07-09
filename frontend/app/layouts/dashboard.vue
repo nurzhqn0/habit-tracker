@@ -16,10 +16,15 @@ onMounted(async () => {
   if (prefs?.theme) colorMode.preference = prefs.theme;
 });
 
+const isAdmin = useIsAdmin();
+
 const items = computed<NavigationMenuItem[]>(() => [
   { label: "Habits", icon: "i-lucide-list-checks", to: "/app" },
   { label: "Rooms", icon: "i-lucide-users", to: "/app/rooms" },
   { label: "Settings", icon: "i-lucide-settings", to: "/app/settings" },
+  ...(isAdmin.value
+    ? [{ label: "Admin", icon: "i-lucide-shield", to: "/app/admin" }]
+    : []),
 ]);
 
 function isActive(to: string): boolean {
