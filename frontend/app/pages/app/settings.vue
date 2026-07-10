@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Preferences } from "~~/shared/types/api";
+import type { Preferences, User } from "~~/shared/types/api";
 import { apiFetch } from "~/services/api/client";
 
 definePageMeta({ layout: "dashboard" });
@@ -9,6 +9,7 @@ const toast = useToast();
 const auth = useAuthStore();
 const colorMode = useColorMode();
 const { sendToTelegram, sending } = useDownload();
+const { botUsername } = useRuntimeConfig().public;
 
 const prefs = ref<Preferences | null>(null);
 const importing = ref(false);
@@ -18,6 +19,8 @@ const TIMEZONES = Intl.supportedValuesOf?.("timeZone") ?? ["UTC"];
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 onMounted(async () => {
+  // Refresh bot_linked in case the user connected the bot after logging in.
+  apiFetch<User>("/me").then((user) => (auth.user = user)).catch(() => {});
   prefs.value = await apiFetch<Preferences>("/me/preferences");
   if (!prefs.value.timezone || prefs.value.timezone === "UTC") {
     const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -59,6 +62,8 @@ async function onImportFile(event: Event) {
     if (fileInput.value) fileInput.value.value = "";
   }
 }
+
+const botLink = computed(() => (botUsername ? `https://t.me/${botUsername}?start=link` : null));
 </script>
 
 <template>
@@ -118,6 +123,35 @@ async function onImportFile(event: Event) {
               description="Days without data show ? and can be explicitly marked as not done."
               @update:model-value="(v: boolean) => save({ show_question_marks: v })"
             />
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <p class="font-semibold text-highlighted">Telegram bot</p>
+          </template>
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="text-sm font-medium text-default">Bot connection</p>
+              <p class="text-sm text-muted">
+                {{
+                  auth.user?.bot_linked
+                    ? "Connected — the bot can send you reminders and exports."
+                    : "Open the bot and send /start to connect it."
+                }}
+              </p>
+            </div>
+            <UBadge v-if="auth.user?.bot_linked" color="success" variant="subtle" icon="i-lucide-check">
+              Connected
+            </UBadge>
+            <UButton
+              v-else-if="botLink"
+              :to="botLink"
+              target="_blank"
+              icon="i-lucide-send"
+              label="Connect bot"
+            />
+            <UBadge v-else color="neutral" variant="subtle">Bot not configured</UBadge>
           </div>
         </UCard>
 
