@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile
@@ -10,9 +11,13 @@ from app.infrastructure.db.tables import UserRow
 from app.infrastructure.telegram.bot_api import send_document
 
 router = APIRouter(tags=["export"])
+logger = logging.getLogger(__name__)
 
 ZIP_MEDIA = "application/zip"
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# Telegram errors that mean the user's chat with the bot is gone for good.
+_UNLINKED_MARKERS = ("chat not found", "bot was blocked", "user is deactivated")
 
 
 def _xlsx_response(data: bytes, filename: str) -> Response:
@@ -23,15 +28,23 @@ def _xlsx_response(data: bytes, filename: str) -> Response:
 
 
 async def _deliver(
-    user: UserRow, settings: SettingsDep, data: bytes, filename: str, caption: str, media: str
+    user: UserRow, session: SessionDep, settings: SettingsDep,
+    data: bytes, filename: str, caption: str, media: str,
 ) -> Response:
     """Sends the file to the user's Telegram chat instead of returning it for download."""
     if not user.bot_linked:
         raise ValidationError("Connect the Telegram bot first, then export again.")
-    ok = await send_document(settings.bot_token, user.telegram_id, filename, data, caption)
-    if not ok:
-        raise HTTPException(status_code=502, detail="Telegram could not deliver the file.")
-    return JSONResponse({"ok": True, "delivered": "telegram"})
+    error = await send_document(settings.bot_token, user.telegram_id, filename, data, caption)
+    if error is None:
+        return JSONResponse({"ok": True, "delivered": "telegram"})
+    logger.warning("telegram delivery failed for user %s: %s", user.id, error)
+    if any(marker in error.lower() for marker in _UNLINKED_MARKERS):
+        # The chat is gone (bot blocked / never started) — unlink so Settings
+        # shows the real state and the user is told to reconnect.
+        user.bot_linked = False
+        await session.commit()
+        raise ValidationError("Connect the Telegram bot first, then export again.")
+    raise HTTPException(status_code=502, detail="Telegram could not deliver the file.")
 
 
 @router.get("/export/csv")
@@ -40,7 +53,7 @@ async def export_all_csv(
 ) -> Response:
     data = await csv_io.export_zip(session, user.id)
     if to_telegram:
-        return await _deliver(user, settings, data, "habitflow-export.zip", "Your HabitFlow export", ZIP_MEDIA)
+        return await _deliver(user, session, settings, data, "habitflow-export.zip", "Your HabitFlow export", ZIP_MEDIA)
     return Response(
         data, media_type=ZIP_MEDIA,
         headers={"Content-Disposition": 'attachment; filename="habitflow-export.zip"'},
@@ -53,7 +66,7 @@ async def export_all_xlsx(
 ) -> Response:
     data = await csv_io.export_xlsx(session, user.id)
     if to_telegram:
-        return await _deliver(user, settings, data, "habitflow-export.xlsx", "Your HabitFlow export", XLSX_MEDIA)
+        return await _deliver(user, session, settings, data, "habitflow-export.xlsx", "Your HabitFlow export", XLSX_MEDIA)
     return _xlsx_response(data, "habitflow-export.xlsx")
 
 
@@ -69,7 +82,7 @@ async def export_personal_report(
     data, frm, to = await xlsx_reports.export_personal_xlsx(session, user.id, from_date, to_date)
     filename = f"habits-report_{frm}_{to}.xlsx"
     if to_telegram:
-        return await _deliver(user, settings, data, filename, f"Habits report {frm} → {to}", XLSX_MEDIA)
+        return await _deliver(user, session, settings, data, filename, f"Habits report {frm} → {to}", XLSX_MEDIA)
     return _xlsx_response(data, filename)
 
 
@@ -86,7 +99,7 @@ async def export_room_report(
     data, frm, to = await xlsx_reports.export_room_xlsx(session, user.id, room_id, from_date, to_date)
     filename = f"room-{room_id}-report_{frm}_{to}.xlsx"
     if to_telegram:
-        return await _deliver(user, settings, data, filename, f"Room report {frm} → {to}", XLSX_MEDIA)
+        return await _deliver(user, session, settings, data, filename, f"Room report {frm} → {to}", XLSX_MEDIA)
     return _xlsx_response(data, filename)
 
 

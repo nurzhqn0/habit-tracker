@@ -10,10 +10,10 @@ import httpx
 
 async def send_document(
     bot_token: str, chat_id: int, filename: str, content: bytes, caption: str | None = None
-) -> bool:
-    """Sends a file to a chat. Returns False on any failure (incl. bot not started)."""
+) -> str | None:
+    """Sends a file to a chat. Returns None on success, an error description on failure."""
     if not bot_token:
-        return False
+        return "bot token not configured"
     url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
     data = {"chat_id": str(chat_id)}
     if caption:
@@ -21,6 +21,12 @@ async def send_document(
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(url, data=data, files={"document": (filename, content)})
-        return response.status_code == 200 and response.json().get("ok") is True
-    except (httpx.HTTPError, ValueError):
-        return False
+    except httpx.HTTPError as exc:
+        return f"request failed: {exc}"
+    try:
+        body = response.json()
+    except ValueError:
+        return f"HTTP {response.status_code}"
+    if response.status_code == 200 and body.get("ok") is True:
+        return None
+    return str(body.get("description") or f"HTTP {response.status_code}")
