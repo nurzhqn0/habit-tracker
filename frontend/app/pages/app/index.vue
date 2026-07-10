@@ -216,31 +216,20 @@ async function onDragEnd() {
         />
       </div>
 
-      <div v-else class="min-w-fit">
-        <div>
-          <div class="border-default flex items-center gap-2 border-b pb-2">
-            <div
-              class="bg-default sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch"
-            >
-              <div class="w-6 shrink-0" />
-              <div class="min-w-28 flex-1 sm:min-w-40" />
-            </div>
-            <div
-              v-for="date in days"
-              :key="date"
-              class="text-muted w-9 text-center text-[10px] leading-tight uppercase"
-            >
-              <div>{{ weekdayShort(date) }}</div>
-              <div
-                class="font-semibold"
-                :class="date === today ? 'text-primary' : ''"
-              >
-                {{ dayOfMonth(date) }}
-              </div>
-            </div>
-            <div class="w-8 shrink-0" />
+      <div v-else class="flex w-full items-start">
+        <!-- LEFT COLUMN: Narrower on mobile (w-36), wider on larger screens (sm:w-52) -->
+        <div
+          class="bg-default border-default z-10 w-44 shrink-0 border-r sm:w-52"
+        >
+          <!-- Header Left -->
+          <div
+            class="border-default flex h-12 items-center gap-1 border-b pb-2 sm:gap-2"
+          >
+            <div class="w-6 shrink-0" />
+            <div class="flex-1" />
           </div>
 
+          <!-- Draggable Habits -->
           <draggable
             v-model="store.items"
             item-key="habit.id"
@@ -251,45 +240,75 @@ async function onDragEnd() {
             <template #item="{ element: item }">
               <div
                 data-testid="habit-row"
-                class="border-default flex items-center gap-2 border-b py-1"
+                class="border-default bg-default flex h-14 items-center gap-1 border-b pr-1 sm:gap-2 sm:pr-2"
               >
-                <div
-                  class="bg-default sticky left-0 z-10 flex flex-1 items-center gap-2 self-stretch"
+                <UIcon
+                  name="i-lucide-grip-vertical"
+                  class="drag-handle text-dimmed w-6 shrink-0"
+                  :class="dragEnabled ? 'cursor-grab' : 'opacity-20'"
+                />
+
+                <!-- Adjusted gap-2 for mobile, gap-3 for larger screens -->
+                <NuxtLink
+                  :to="`/app/habits/${item.habit.id}`"
+                  class="flex min-w-0 flex-1 items-center gap-2 sm:gap-3"
                 >
-                  <UIcon
-                    name="i-lucide-grip-vertical"
-                    class="drag-handle text-dimmed w-6 shrink-0"
-                    :class="dragEnabled ? 'cursor-grab' : 'opacity-20'"
+                  <HabitScoreRing
+                    :score="item.score"
+                    :color="paletteColor(item.habit.color)"
                   />
+                  <div class="min-w-0">
+                    <p
+                      class="truncate text-sm font-medium"
+                      :style="{ color: paletteColor(item.habit.color) }"
+                    >
+                      {{ item.habit.name }}
+                    </p>
+                    <p
+                      v-if="item.streak > 1"
+                      class="text-muted flex items-center gap-1 text-xs"
+                    >
+                      <UIcon name="i-lucide-flame" class="size-3" />{{
+                        item.streak
+                      }}
+                      days
+                    </p>
+                  </div>
+                </NuxtLink>
+              </div>
+            </template>
+          </draggable>
+        </div>
 
-                  <NuxtLink
-                    :to="`/app/habits/${item.habit.id}`"
-                    class="flex min-w-28 flex-1 items-center gap-3 sm:min-w-40"
-                  >
-                    <HabitScoreRing
-                      :score="item.score"
-                      :color="paletteColor(item.habit.color)"
-                    />
-                    <div class="min-w-0">
-                      <p
-                        class="truncate text-sm font-medium"
-                        :style="{ color: paletteColor(item.habit.color) }"
-                      >
-                        {{ item.habit.name }}
-                      </p>
-                      <p
-                        v-if="item.streak > 1"
-                        class="text-muted flex items-center gap-1 text-xs"
-                      >
-                        <UIcon name="i-lucide-flame" class="size-3" />{{
-                          item.streak
-                        }}
-                        days
-                      </p>
-                    </div>
-                  </NuxtLink>
+        <!-- RIGHT COLUMN: Scrollable Dates -->
+        <div class="flex-1 overflow-x-auto pb-4">
+          <div class="w-full min-w-max">
+            <!-- Header Right -->
+            <div
+              class="border-default flex h-12 w-full items-center justify-end gap-2 border-b px-2 pb-2"
+            >
+              <div
+                v-for="date in days"
+                :key="date"
+                class="text-muted w-9 text-center text-[10px] leading-tight uppercase"
+              >
+                <div>{{ weekdayShort(date) }}</div>
+                <div
+                  class="font-semibold"
+                  :class="date === today ? 'text-primary' : ''"
+                >
+                  {{ dayOfMonth(date) }}
                 </div>
+              </div>
+            </div>
 
+            <!-- Scrollable Cells -->
+            <div>
+              <div
+                v-for="item in store.items"
+                :key="item.habit.id"
+                class="border-default flex h-14 w-full items-center justify-end gap-2 border-b px-2"
+              >
                 <template v-for="date in days" :key="date">
                   <HabitNumberCell
                     v-if="item.habit.type === 1"
@@ -308,20 +327,9 @@ async function onDragEnd() {
                     @toggle="onToggle(item, date)"
                   />
                 </template>
-
-                <UDropdownMenu :items="rowMenu(item)">
-                  <UButton
-                    icon="i-lucide-ellipsis-vertical"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
-                    class="w-8 shrink-0"
-                    aria-label="Habit menu"
-                  />
-                </UDropdownMenu>
               </div>
-            </template>
-          </draggable>
+            </div>
+          </div>
         </div>
       </div>
 
