@@ -32,6 +32,14 @@ export default defineNuxtPlugin(async () => {
   wa.disableVerticalSwipes?.();
   wa.enableClosingConfirmation();
 
+  // Fullscreen on mobile only (Bot API 8.0+). Desktop/web are unsupported and
+  // ignore it; safe-area insets are auto-exposed by the SDK as CSS vars that the
+  // app shell consumes (see assets/css/main.css --app-inset-*).
+  const MOBILE = new Set(["ios", "android"]);
+  if (wa.isVersionAtLeast?.("8.0") && MOBILE.has(wa.platform ?? "")) {
+    wa.requestFullscreen?.();
+  }
+
   // Paint Telegram's native chrome to match the app's resolved theme. The
   // theme itself follows the user's saved preference (applied by the dashboard
   // layout) — Telegram's own scheme must not override the user's choice. These

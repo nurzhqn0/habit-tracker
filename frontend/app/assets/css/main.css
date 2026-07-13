@@ -13,6 +13,19 @@
   --ui-radius: 0.5rem;
 }
 
+/* Unified safe-area insets. Inside a Telegram Mini App these resolve to the
+   SDK's auto-set --tg-* vars (device notch + Telegram's fullscreen controls);
+   in a mobile browser to native env(); everywhere else to 0. */
+:root {
+  --app-inset-top: calc(
+    max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px)) +
+      var(--tg-content-safe-area-inset-top, 0px)
+  );
+  --app-inset-right: max(env(safe-area-inset-right, 0px), var(--tg-safe-area-inset-right, 0px));
+  --app-inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
+  --app-inset-left: max(env(safe-area-inset-left, 0px), var(--tg-safe-area-inset-left, 0px));
+}
+
 /* Warm bone canvas in light mode only. */
 html:not(.dark) {
   --ui-bg: #fbfbfa;

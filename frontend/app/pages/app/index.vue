@@ -216,7 +216,7 @@ async function onDragEnd() {
         />
       </div>
 
-      <div v-else class="flex w-full items-start">
+      <div v-else class="flex w-full items-start lg:mx-auto lg:w-fit">
         <!-- LEFT COLUMN: Narrower on mobile (w-36), wider on larger screens (sm:w-52) -->
         <div
           class="bg-default border-default z-10 w-44 shrink-0 border-r sm:w-52"
@@ -285,7 +285,7 @@ async function onDragEnd() {
           <div class="w-full min-w-max">
             <!-- Header Right -->
             <div
-              class="border-default flex h-12 w-full items-center justify-end gap-2 border-b px-2 pb-2"
+              class="border-default flex h-12 w-full items-center justify-start gap-2 border-b px-2 pb-2"
             >
               <div
                 v-for="date in days"
@@ -307,7 +307,7 @@ async function onDragEnd() {
               <div
                 v-for="item in store.items"
                 :key="item.habit.id"
-                class="border-default flex h-14 w-full items-center justify-end gap-2 border-b px-2"
+                class="border-default flex h-14 w-full items-center justify-start gap-2 border-b px-2"
               >
                 <template v-for="date in days" :key="date">
                   <HabitNumberCell

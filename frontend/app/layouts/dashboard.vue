@@ -63,7 +63,7 @@ function isActive(to: string): boolean {
 
     <nav
       class="fixed inset-x-0 bottom-0 z-40 flex border-t border-default bg-default/90 backdrop-blur lg:hidden"
-      style="padding-bottom: env(safe-area-inset-bottom)"
+      style="padding-bottom: var(--app-inset-bottom); padding-left: var(--app-inset-left); padding-right: var(--app-inset-right)"
       aria-label="Primary"
     >
       <NuxtLink

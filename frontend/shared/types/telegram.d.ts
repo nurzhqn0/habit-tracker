@@ -9,9 +9,17 @@ export interface TelegramWebApp {
   colorScheme: "light" | "dark";
   themeParams: Record<string, string>;
   isExpanded: boolean;
+  version: string;
+  platform: string;
+  isFullscreen: boolean;
+  safeAreaInset?: { top: number; right: number; bottom: number; left: number };
+  contentSafeAreaInset?: { top: number; right: number; bottom: number; left: number };
   ready(): void;
   expand(): void;
   close(): void;
+  isVersionAtLeast?(version: string): boolean;
+  requestFullscreen?(): void;
+  exitFullscreen?(): void;
   enableClosingConfirmation(): void;
   disableVerticalSwipes?(): void;
   setHeaderColor?(color: string): void;
