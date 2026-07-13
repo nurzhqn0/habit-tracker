@@ -22,7 +22,8 @@ services:
       BOT_USERNAME: ${BOT_USERNAME:-}
       TG_CLIENT_ID: ${TG_CLIENT_ID:-}
       TG_CLIENT_SECRET: ${TG_CLIENT_SECRET:-}
-      FRONTEND_ORIGIN: http://localhost:3000
+      # Set FRONTEND_ORIGIN to your HTTPS tunnel URL in .env when using Telegram.
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       # Enables POST /auth/test-login → the frontend "Dev login" button.
       TEST_MODE: "true"
       # Dev login user is "testuser" — set ADMIN_USERNAME=testuser (plus
@@ -47,7 +48,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production-0000}
       BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in .env}
       BOT_USERNAME: ${BOT_USERNAME:-}
-      FRONTEND_ORIGIN: http://localhost:3000
+      # Bot's Open-app buttons open this URL — must be the HTTPS tunnel for Mini App.
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
     volumes:
       - ./backend/app:/srv/app/app
       - sqlite-dev-data:/srv/app/data

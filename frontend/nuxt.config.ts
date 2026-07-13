@@ -38,4 +38,18 @@ export default defineNuxtConfig({
       adminUsername: "", // NUXT_PUBLIC_ADMIN_USERNAME — UI gating only, backend enforces
     },
   },
+  // Dev-only: lets you serve `npm run dev` behind an HTTPS tunnel (Telegram
+  // requires https). Set NUXT_PUBLIC_API_BASE=/api/v1 so the browser calls the
+  // same (https) origin; this proxy forwards /api to the Dockerized api, so no
+  // mixed-content and no CORS. allowedHosts lets the tunnel domain reach Vite.
+  $development: {
+    nitro: {
+      devProxy: {
+        "/api": { target: "http://localhost:8000/api", changeOrigin: true },
+      },
+    },
+    vite: {
+      server: { allowedHosts: true },
+    },
+  },
 });
