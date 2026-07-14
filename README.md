@@ -9,12 +9,13 @@
   </a>
 </p>
 
-HabitFlow is a web app that helps you create and maintain good habits — together
-with your friends. It is a full web rebuild of [Loop Habit Tracker
+HabitFlow is a Telegram Mini App that helps you create and maintain good habits
+— together with your friends. It is a full web rebuild of [Loop Habit Tracker
 (uHabits)](https://github.com/iSoron/uhabits), powered by a line-by-line port of
-the original habit engine, with shared rooms, leaderboards, and a Telegram bot
-on top. Detailed charts and statistics show you how your habits improved over
-time.
+the original habit engine, with shared rooms, leaderboards, and a companion bot
+on top. Open it inside Telegram and you are signed in instantly — no passwords,
+no registration. Detailed charts and statistics show you how your habits
+improved over time.
 
 ## Screenshots
 
@@ -53,11 +54,13 @@ time.
   completions). An activity feed shows who checked in, and owner/admin/member
   roles let you manage the room together.
 
-* **Telegram-native.** No passwords and no registration forms — log in with
-  your Telegram account in one tap. A companion bot sends reminders at each
-  habit's chosen time, in your own timezone, on the days you pick. Check off
-  or skip your habit directly from the chat with inline ✅ Done / ⏭ Skip /
-  🕐 Later buttons.
+* **Telegram-native.** HabitFlow runs as a Telegram Mini App: open it from the
+  bot and it signs you in automatically from Telegram's signed `initData` — no
+  passwords and no registration forms. It adopts Telegram's light/dark theme and
+  native chrome, with the back button, haptics, and fullscreen on mobile. A
+  companion bot sends reminders at each habit's chosen time, in your own
+  timezone, on the days you pick — check off or skip your habit directly from the
+  chat with inline ✅ Done / ⏭ Skip / 🕐 Later buttons.
 
 * **Flexible habits and schedules.** Yes/no and measurable habits (at-least /
   at-most targets with units), daily or more complex schedules such as 3 times
@@ -87,7 +90,7 @@ time.
 | Frontend | Nuxt 4, Vue 3, Nuxt UI v4, Pinia, custom SVG charts |
 | Backend | FastAPI, SQLAlchemy 2.0 (async) + SQLite (WAL), Alembic, clean architecture (domain / application / infrastructure / api) |
 | Bot | aiogram 3 worker process + APScheduler |
-| Auth | Telegram Login Widget (HMAC-verified) → JWT access + rotating refresh tokens |
+| Auth | Telegram Mini App `initData` (HMAC via bot token); Login Widget + redirect-code fallback for browsers → JWT access + rotating refresh tokens |
 | Deploy | Docker Compose: nginx reverse proxy + api + bot + frontend, shared SQLite volume |
 
 ## Installing
@@ -100,8 +103,10 @@ cp .env.example .env            # set JWT_SECRET (openssl rand -hex 32), BOT_TOK
 make up                         # nginx on :80 (and :443 once TLS is configured)
 ```
 
-The Telegram Login Widget requires your domain to be linked to the bot via
-[@BotFather](https://t.me/BotFather) → `/setdomain`.
+Register the Mini App with [@BotFather](https://t.me/BotFather) → `/newapp` (or
+**Bot Settings → Menu Button**) and point its Web App URL at
+`https://your-domain/app`. For the in-browser Login Widget fallback, also link
+your domain via `/setdomain`.
 
 For a full walkthrough — blank Ubuntu server to live HTTPS deployment, with
 certs, bot setup, backups, and updates — see [DEPLOY.md](DEPLOY.md).
@@ -122,8 +127,9 @@ make web                        # Nuxt on :3000
 make bot                        # Telegram bot worker (optional)
 ```
 
-No bot configured? Set `TEST_MODE=true` for the backend and the landing page
-shows a **Dev login** button instead of the Telegram widget.
+No bot configured? Set `TEST_MODE=true` for the backend; under `nuxt dev` the
+app signs itself in through the TEST_MODE endpoint, so every feature is usable at
+http://localhost:3000 without Telegram.
 
 Seed demo data: `cd backend && uv run python scripts/seed.py`
 
